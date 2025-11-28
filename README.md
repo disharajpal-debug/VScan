@@ -1,4 +1,4 @@
-# 📇 Visiting Card Scanner
+# VScan
 
 A modern web application that uses AI (Google Gemini) to automatically extract details from visiting card images and store them in MongoDB.
 
@@ -71,11 +71,11 @@ A modern web application that uses AI (Google Gemini) to automatically extract d
    - View all previously scanned cards
    - Click "Refresh Cards" to update the list
 
-## 🗄️ Database Structure
+- ## 🗄️ Database Structure
 
 The application uses MongoDB with the following structure:
 
-- **Database**: `visiting_card`
+- **Database**: `vscan`
 - **Collection**: `cards`
 
 Each card document contains:
@@ -117,7 +117,7 @@ The API key is already configured in the code. If you need to use your own:
 ## 📁 Project Structure
 
 ```
-Scanner/
+VScan/
 ├── back.py              # Flask backend server
 ├── requirements.txt     # Python dependencies
 ├── README.md           # This file

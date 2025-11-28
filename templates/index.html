@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visiting Card Scanner</title>
+    <title>VScan</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
@@ -824,7 +824,7 @@
       <div class="container-fluid">
         <a class="navbar-brand fw-bold text-primary d-flex align-items-center gap-2" href="#" onclick="showSection('upload', event); setActiveNav('uploadNav'); return false;">
           <img src="{{ url_for('static', filename='c4i4-logo.png') }}" alt="C4i4 Lab Logo" style="max-height: 38px; width: auto; object-fit: contain;">
-          <span>📇 Card Scanner</span>
+          <span>📇 VScan</span>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
@@ -842,6 +842,11 @@
               <a class="nav-link" id="personalCardsNav" href="#" onclick="showSection('personalCards', event); setActiveNav('personalCardsNav')">Personal Cards</a>
             </li>
             {% endif %}
+                        {% if session.get('role') == 'admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" id="adminNav" href="/admin">Admin</a>
+                        </li>
+                        {% endif %}
           </ul>
           <a href="/logout" class="btn btn-danger ms-lg-3">Sign Out</a>
         </div>
@@ -850,7 +855,7 @@
 
     <div class="container">
         <div class="header">
-            <h1>📇 Visiting Card Scanner</h1>
+            <h1>📇 VScan</h1>
             
         </div>
 
@@ -963,7 +968,7 @@
         <div class="modal-content">
             <span class="close" onclick="closeEditModal()">&times;</span>
             <h3 class="modal-title">Edit Card Details</h3>
-            <form id="editForm">
+            <form id="editForm" novalidate>
                 <div class="form-group">
                     <label class="form-label">Name</label>
                     <input type="text" class="form-input" id="editName" name="name">
@@ -990,7 +995,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Website</label>
-                    <input type="url" class="form-input" id="editWebsite" name="website">
+                    <input type="text" class="form-input" id="editWebsite" name="website" placeholder="https://example.com">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Additional Info</label>
@@ -1149,7 +1154,19 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                // Check for rate limiting (429) or service unavailable (503)
+                if (response.status === 429) {
+                    return response.json().then(data => {
+                        throw { status: 429, data };
+                    });
+                } else if (response.status === 503) {
+                    return response.json().then(data => {
+                        throw { status: 503, data };
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 loading.style.display = 'none';
                 if (data.success) {
@@ -1179,7 +1196,10 @@
                 } else if (data.error && data.error.toLowerCase().includes('duplicate')) {
                     loading.style.display = 'none';
                     showToast('Duplicate card detected. This card already exists.', '⚠️');
-                } else if (data.error && data.error.toLowerCase().includes('503')) {
+                } else if (data.error && data.error.toLowerCase().includes('rate limit')) {
+                    loading.style.display = 'none';
+                    showToast('API rate limit reached. Please wait a few minutes and try again.', '⏳');
+                } else if (data.error && data.error.toLowerCase().includes('service')) {
                     loading.style.display = 'none';
                     showToast('The card extraction service is temporarily unavailable. Please try again in a few minutes.', '❌');
                 } else {
@@ -1189,7 +1209,13 @@
             })
             .catch(error => {
                 loading.style.display = 'none';
-                showToast('Error: ' + error, '❌');
+                if (error.status === 429) {
+                    showToast('API rate limit reached. Please wait and try again.', '⏳');
+                } else if (error.status === 503) {
+                    showToast('The extraction service is temporarily unavailable. Please try again later.', '❌');
+                } else {
+                    showToast('Error: ' + (error.data?.details || error.message || error), '❌');
+                }
             });
         });
 
@@ -1509,6 +1535,16 @@
             
             for (let [key, value] of formData.entries()) {
                 updateData[key] = value || null;
+            }
+
+            // Normalize website field: prepend http:// if user entered without scheme
+            if (updateData.website && typeof updateData.website === 'string') {
+                const w = updateData.website.trim();
+                if (w && !/^https?:\/\//i.test(w)) {
+                    updateData.website = 'http://' + w;
+                } else {
+                    updateData.website = w;
+                }
             }
             
             try {
@@ -1905,14 +1941,32 @@
             history.pushState(null, '', window.location.pathname);
         });
     </script>
-    <script>
+        <script>
+// Ensure edit form validation is disabled and website input treated as plain text
 window.addEventListener('DOMContentLoaded', (event) => {
-  {% if show_welcome_modal %}
-    var name = "{{ name }}";
-    if (name) {
-      showToast("Welcome, " + name + "!", "👋", 4000);
+    try {
+        const ef = document.getElementById('editForm');
+        if (ef) {
+            ef.setAttribute('novalidate', 'true');
+            ef.noValidate = true;
+        }
+        const ew = document.getElementById('editWebsite');
+        if (ew) {
+            ew.type = 'text';
+            ew.removeAttribute('required');
+            // ensure placeholder stays informative but not enforced
+            if (!ew.placeholder) ew.placeholder = 'https://example.com';
+        }
+    } catch (e) {
+        console.warn('Failed to force-disable validation:', e);
     }
-  {% endif %}
+
+    {% if show_welcome_modal %}
+        var name = "{{ name }}";
+        if (name) {
+            showToast("Welcome, " + name + "!", "👋", 4000);
+        }
+    {% endif %}
 });
 </script>
     <footer style="background: rgba(255,255,255,0.7); color: #000; text-align: center; padding: 18px 0; font-size: 1rem; font-weight: 500; box-shadow: 0 -2px 20px rgba(0,0,0,0.05); border-top-left-radius: 20px; border-top-right-radius: 20px; margin-top: 40px;">

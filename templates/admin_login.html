@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Login - VScan</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="container" style="max-width:520px;margin:40px auto;">
+      <h2>Admin Login</h2>
+      <p>Enter the admin token to sign in as an administrator. Email is optional (defaults to configured admin email).</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div>
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        <div class="form-group">
+          <label for="email">Email (optional)</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="admin@example.com">
+        </div>
+        <div class="form-group">
+          <label for="token">Admin Token</label>
+          <input type="text" id="token" name="token" class="form-control" required>
+        </div>
+        <div style="margin-top:16px;">
+          <button type="submit" class="btn btn-primary">Sign in as Admin</button>
+          <a href="/login" class="btn btn-link">Back to regular login</a>
+        </div>
+      </form>
+    </div>
+  </body>
+</html>
