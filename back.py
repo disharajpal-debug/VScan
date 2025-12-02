@@ -53,9 +53,15 @@ if not GEMINI_API_KEY:
 
 
 # MongoDB configuration - Load from environment
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
+MONGO_URI = os.environ.get("MONGO_URI")
 DB_NAME = os.environ.get("DATABASE_NAME", "visiting_card")
 COLLECTION_NAME = os.environ.get("DB_COLLECTION_NAME", "cards")
+
+if not MONGO_URI:
+    raise Exception(
+        "❌ MONGO_URI is not set! Add it in Render Dashboard → Environment."
+    )
+
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
