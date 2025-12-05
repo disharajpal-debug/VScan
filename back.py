@@ -63,10 +63,7 @@ if not GEMINI_API_KEY:
 
 
 # MongoDB configuration - Load from environment
-<<<<<<< HEAD
-# MongoDB configuration - MUST come from environment on Render
-=======
->>>>>>> 025ab2f850c90eaa5a42eb8f442a3325ef00493f
+
 MONGO_URI = os.environ.get("MONGO_URI")
 DB_NAME = os.environ.get("DATABASE_NAME", "visiting_card")
 COLLECTION_NAME = os.environ.get("DB_COLLECTION_NAME", "cards")
