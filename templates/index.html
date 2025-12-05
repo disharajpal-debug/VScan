@@ -835,6 +835,7 @@
             <li class="nav-item">
               <a class="nav-link" id="uploadNav" href="#" onclick="showSection('upload', event); setActiveNav('uploadNav')">Upload</a>
             </li>
+<<<<<<< HEAD
                         <li class="nav-item">
                             {% if session.get('role') == 'admin' %}
                                 <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">All Cards</a>
@@ -842,6 +843,11 @@
                                 <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">Shared Cards</a>
                             {% endif %}
                         </li>
+=======
+            <li class="nav-item">
+              <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">Shared Cards</a>
+            </li>
+>>>>>>> 025ab2f850c90eaa5a42eb8f442a3325ef00493f
             {% if session['user'] and session['user'] != 'c4i4.lab@c4i4.com' %}
             <li class="nav-item">
               <a class="nav-link" id="personalCardsNav" href="#" onclick="showSection('personalCards', event); setActiveNav('personalCardsNav')">Personal Cards</a>
