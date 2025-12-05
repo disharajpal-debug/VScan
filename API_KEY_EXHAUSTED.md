@@ -17,14 +17,18 @@ Free Tier Limits:
 You have 2 options:
 
 ### Option A: Quick Fix (5 minutes) - FREE but limited
+
 **Go to:** https://makersuite.google.com/app/apikey
+
 - Create new free API key
 - Replace old key in `.env`
 - Restart Flask
 - ⚠️ Will hit limit again in few days
 
 ### Option B: Proper Fix (15 minutes) - RECOMMENDED
+
 **Go to:** https://console.cloud.google.com/
+
 - Enable billing (uses $300 free credits)
 - Create new paid API key
 - Replace old key in `.env`
@@ -36,6 +40,7 @@ You have 2 options:
 ## 📋 Step-by-Step for Option B (Recommended)
 
 ### 1. Create Google Cloud Project
+
 ```
 https://console.cloud.google.com/
   ↓
@@ -51,6 +56,7 @@ Wait 30 seconds...
 ```
 
 ### 2. Enable Billing
+
 ```
 Left menu → "Billing"
   ↓
@@ -66,6 +72,7 @@ You get $300 FREE! 🎉
 ```
 
 ### 3. Enable Generative Language API
+
 ```
 Left menu → "API & Services" → "Library"
   ↓
@@ -77,6 +84,7 @@ Click "Enable"
 ```
 
 ### 4. Get New API Key
+
 ```
 Left menu → "API & Services" → "Credentials"
   ↓
@@ -86,6 +94,7 @@ Copy your new key
 ```
 
 ### 5. Update Application
+
 ```
 File: C:\Users\admin\Visiting_card_reader\.env
 
@@ -97,6 +106,7 @@ GEMINI_API_KEY=AIza...paste_your_new_key_here...
 ```
 
 ### 6. Save & Restart
+
 ```powershell
 # Press CTRL+C (stops Flask)
 python back.py
@@ -104,6 +114,7 @@ python back.py
 ```
 
 ### 7. Test
+
 ```
 Go to: http://localhost:5000
 Upload a card
@@ -114,10 +125,10 @@ Should work now! ✅
 
 ## 📞 Where to Get Keys
 
-| Option | URL | Time | Cost |
-|--------|-----|------|------|
-| Quick (Free) | https://makersuite.google.com/app/apikey | 5 min | $0 |
-| Best (Paid) | https://console.cloud.google.com/ | 15 min | $0 (free credits) |
+| Option       | URL                                      | Time   | Cost              |
+| ------------ | ---------------------------------------- | ------ | ----------------- |
+| Quick (Free) | https://makersuite.google.com/app/apikey | 5 min  | $0                |
+| Best (Paid)  | https://console.cloud.google.com/        | 15 min | $0 (free credits) |
 
 ---
 
@@ -189,12 +200,14 @@ After updating API key:
 ## 🚀 Next Steps
 
 ### Immediate (Do Now):
+
 1. Get new API key (5-15 min)
 2. Update `.env` file
 3. Restart Flask
 4. Test upload
 
 ### Then:
+
 - Use app normally
 - Monitor usage in Google Cloud Console
 - Can upgrade plan later if needed
@@ -220,9 +233,9 @@ Estimated Time: 15 minutes ⏱️
 4. Restart Flask
 5. Try uploading a card
 
-**I'm ready to help if you get stuck!** 
+**I'm ready to help if you get stuck!**
 
 Check the detailed guides:
+
 - `QUICK_API_FIX.md` - 5 minute version
 - `GET_NEW_API_KEY.md` - Full detailed guide
-

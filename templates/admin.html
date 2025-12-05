@@ -3,112 +3,386 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Cards</title>
+    <title>Admin Dashboard - Cards Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
-        .table-wrap { max-width: 1200px; margin: 0 auto; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .dashboard-header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .dashboard-header h1 {
+            color: #333;
+            margin: 0 0 5px 0;
+            font-weight: 600;
+            font-size: 1.8em;
+        }
+        .dashboard-header p {
+            color: #666;
+            margin: 5px 0 0 0;
+            font-size: 0.95em;
+        }
+        .container-fluid {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .controls button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+        }
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+        .export-btn {
+            background: #48bb78;
+            color: white;
+        }
+        .export-btn:hover {
+            background: #38a169;
+        }
+        .export-excel-btn {
+            background: #48bb78;
+            color: white;
+        }
+        .export-excel-btn:hover {
+            background: #38a169;
+        }
+        .export-pdf-btn {
+            background: #48bb78;
+            color: white;
+        }
+        .export-pdf-btn:hover {
+            background: #38a169;
+        }
+        .back-btn {
+            background: #edf2ff;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+        .back-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .total-cards {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .admin-table {
+            margin-bottom: 0;
+            font-size: 0.9em;
+        }
+        .admin-table thead {
+            background: #667eea;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .admin-table thead th {
+            padding: 12px;
+            font-weight: 600;
+            border: none;
+            white-space: nowrap;
+        }
+        .admin-table tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s;
+        }
+        .admin-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+        .admin-table tbody td {
+            padding: 10px 12px;
+            vertical-align: middle;
+            word-break: break-word;
+        }
+        .shared-yes {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            display: inline-block;
+            font-size: 0.85em;
+        }
+        .shared-no {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            display: inline-block;
+            font-size: 0.85em;
+        }
+        .actions-cell {
+            display: flex;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
+        .action-btn {
+            padding: 5px 10px;
+            font-size: 0.8em;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .delete-btn {
+            background: #ff4444;
+            color: white;
+        }
+        .delete-btn:hover {
+            background: #cc0000;
+        }
+        .toggle-share-btn {
+            background: #ffa500;
+            color: white;
+        }
+        .toggle-share-btn:hover {
+            background: #ff8c00;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 1.1em;
+        }
+        .scanned-by-cell {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .email-cell {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
-    <div class="table-wrap">
-        <h2>Admin Dashboard — All Cards</h2>
-        <div class="mb-3">
-            <button id="refreshBtn" class="btn btn-sm btn-primary">Refresh</button>
-            <button id="exportBtn" class="btn btn-sm btn-success">Export CSV</button>
+    <div class="container-fluid">
+        <div class="dashboard-header">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div>
+                    <h1>📊 Admin Dashboard</h1>
+                    <p>Manage all visiting cards - Logged in as: <strong>{{ admin_name }}</strong></p>
+                </div>
+                <button id="backBtn" class="back-btn">⬅️ Back</button>
+            </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-striped table-bordered" id="adminCardsTable">
-                <thead class="table-dark">
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Company</th>
-                        <th>Designation</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Website</th>
-                        <th>Scanned By</th>
-                        <th>Shared</th>
-                        <th>Uploaded At</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="adminCardsBody"></tbody>
-            </table>
+        <div class="controls">
+            <button class="refresh-btn" id="refreshBtn">🔄 Refresh</button>
+            <button class="export-btn" id="exportBtn">📥 Export CSV</button>
+                        <button class="export-excel-btn" id="exportExcelBtn">📊 Export Excel</button>
+                        <button class="export-pdf-btn" id="exportPdfBtn">📄 Export PDF</button>
+            <div class="total-cards" id="totalCardsInfo">Loading...</div>
+        </div>
+
+        <div class="table-wrapper">
+            <div id="tableContent">
+                <div class="no-data">Loading cards...</div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Global error handlers
+        window.addEventListener('error', function (event) {
+            console.error('Error:', event.error?.message || event.message);
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+            console.error('Promise rejection:', event.reason);
+        });
+
         async function fetchCards() {
-            const res = await fetch('/cards');
-            const data = await res.json();
-            if (!data.success) {
-                alert('Failed to load cards: ' + (data.error || 'unknown'));
+            try {
+                const res = await fetch('/cards', { credentials: 'same-origin' });
+                const data = await res.json();
+                if (!data.success) {
+                    alert('Failed to load cards: ' + (data.error || 'unknown'));
+                    return [];
+                }
+                return data.cards || [];
+            } catch (e) {
+                alert('Error fetching cards: ' + e.message);
                 return [];
             }
-            return data.cards || [];
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleString();
+            } catch (e) {
+                return dateString;
+            }
         }
 
         function renderTable(cards) {
-            const tbody = document.getElementById('adminCardsBody');
-            tbody.innerHTML = '';
+            const container = document.getElementById('tableContent');
+            const totalInfo = document.getElementById('totalCardsInfo');
+            
+            totalInfo.textContent = `Total Cards: ${cards.length}`;
+
             if (!cards.length) {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center">No cards found</td></tr>';
+                container.innerHTML = '<div class="no-data">No cards found</div>';
                 return;
             }
-            for (const c of cards) {
-                const tr = document.createElement('tr');
-                const uploaded = c.uploaded_at ? (new Date(c.uploaded_at)).toLocaleString() : '';
-                tr.innerHTML = `
-                    <td>${c._id}</td>
-                    <td>${c.name || ''}</td>
-                    <td>${c.company || ''}</td>
-                    <td>${c.designation || ''}</td>
-                    <td>${c.email || ''}</td>
-                    <td>${c.phone || ''}</td>
-                    <td>${c.website || ''}</td>
-                    <td>${c.scanned_by || ''}</td>
-                    <td>${c.shared ? 'Yes' : 'No'}</td>
-                    <td>${uploaded}</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger" onclick="deleteCard('${c._id}')">Delete</button>
-                        <button class="btn btn-sm btn-warning" onclick="toggleShare('${c._id}')">Toggle Share</button>
-                    </td>
+
+            let html = `
+                <table class="table admin-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Designation</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Website</th>
+                            <th>Scanned By</th>
+                            <th>Uploaded</th>
+                            <th>Shared</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            for (const card of cards) {
+                const sharedClass = card.shared ? 'shared-yes' : 'shared-no';
+                const sharedText = card.shared ? 'Yes' : 'No';
+                const uploadedAt = formatDate(card.uploaded_at);
+
+                html += `
+                    <tr>
+                        <td><strong>${card.name || 'N/A'}</strong></td>
+                        <td>${card.company || 'N/A'}</td>
+                        <td>${card.designation || 'N/A'}</td>
+                        <td class="email-cell" title="${card.email || 'N/A'}">${card.email || 'N/A'}</td>
+                        <td>${card.phone || 'N/A'}</td>
+                        <td>${card.website || 'N/A'}</td>
+                        <td class="scanned-by-cell" title="${card.scanned_by || 'Unknown'}">${card.scanned_by || 'Unknown'}</td>
+                        <td style="font-size:0.85em;">${uploadedAt}</td>
+                        <td><span class="${sharedClass}">${sharedText}</span></td>
+                        <td>
+                            <div class="actions-cell">
+                                <button class="action-btn toggle-share-btn" onclick="toggleShare('${card._id}', this)" title="${card.shared ? 'Un-share' : 'Share'}">${card.shared ? 'Unshare' : 'Share'}</button>
+                                <button class="action-btn delete-btn" onclick="deleteCard('${card._id}', this)">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
                 `;
-                tbody.appendChild(tr);
             }
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
         }
 
         async function loadAndRender() {
             const cards = await fetchCards();
             renderTable(cards.map(c => ({
                 ...c,
-                // uploaded_at may be an object; try to read ISO if present
                 uploaded_at: typeof c.uploaded_at === 'string' ? c.uploaded_at : (c.uploaded_at && c.uploaded_at.$date) ? c.uploaded_at.$date : c.uploaded_at
             })));
         }
 
-        async function deleteCard(id) {
-            if (!confirm('Delete card ' + id + '?')) return;
-            const res = await fetch('/delete_card/' + id, { method: 'DELETE' });
-            const j = await res.json();
-            if (j.success) { loadAndRender(); alert('Deleted'); }
-            else alert('Failed: ' + (j.error || 'unknown'));
+        async function deleteCard(id, btn) {
+            if (!confirm('Delete this card?')) return;
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Deleting...';
+                const res = await fetch('/delete_card/' + id, { method: 'DELETE', credentials: 'same-origin' });
+                const j = await res.json();
+                if (j.success) {
+                    loadAndRender();
+                    alert('Card deleted successfully');
+                } else {
+                    alert('Failed: ' + (j.error || 'unknown'));
+                    btn.disabled = false;
+                    btn.textContent = 'Delete';
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
         }
 
-        async function toggleShare(id) {
-            const res = await fetch('/share_card/' + id, { method: 'POST' });
-            const j = await res.json();
-            if (j.success) { loadAndRender(); }
-            else alert('Failed to toggle share: ' + (j.error || 'unknown'));
+        async function toggleShare(id, btn) {
+            try {
+                btn.disabled = true;
+                const originalText = btn.textContent;
+                btn.textContent = 'Updating...';
+                const res = await fetch('/share_card/' + id, { method: 'POST', credentials: 'same-origin' });
+                const j = await res.json();
+                if (j.success) {
+                    loadAndRender();
+                } else {
+                    alert('Failed: ' + (j.error || 'unknown'));
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+                btn.disabled = false;
+            }
         }
 
         document.getElementById('refreshBtn').addEventListener('click', loadAndRender);
         document.getElementById('exportBtn').addEventListener('click', () => {
-            // Trigger server CSV download
             window.location.href = '/admin/export_csv';
+        });
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
+            window.location.href = '/admin/export_excel';
+        });
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            window.location.href = '/admin/export_pdf';
+        });
+        document.getElementById('backBtn').addEventListener('click', function() {
+            window.location.href = '/';
         });
 
         // Initial load

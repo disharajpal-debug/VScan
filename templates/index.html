@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-is-admin="{% if session.get('role') == 'admin' %}true{% else %}false{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,128 +33,129 @@
             top: 0;
             z-index: 1000;
             transition: box-shadow 0.3s, background 0.3s;
-        }
-        .navbar:hover {
-            box-shadow: 0 4px 32px rgba(102,126,234,0.18);
-        }
-        .navbar .navbar-brand span {
-            transition: color 0.3s;
-        }
-        .navbar .navbar-brand span:hover {
-            color: #764ba2;
-        }
-        .navbar-nav .nav-link {
-            color: #667eea;
-            font-weight: 500;
-            border-radius: 20px;
-            transition: background 0.3s, color 0.3s, box-shadow 0.3s;
-            padding: 8px 18px;
-            margin: 0 4px;
-        }
-        .navbar-nav .nav-link.active, .navbar-nav .nav-link:focus {
-            background: #667eea;
-            color: #fff !important;
-            box-shadow: 0 2px 8px rgba(102,126,234,0.12);
-        }
-        .navbar-nav .nav-link:hover {
-            background: #f0f2ff;
-            color: #764ba2 !important;
-            box-shadow: 0 2px 8px rgba(102,126,234,0.10);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #ff7675 100%);
-            border: none;
-            color: #fff;
-            font-weight: 600;
-            border-radius: 20px;
-            padding: 8px 22px;
-            transition: background 0.3s, box-shadow 0.3s;
-            box-shadow: 0 2px 8px rgba(220,53,69,0.10);
-        }
-        .btn-danger:hover, .btn-danger:focus {
-            background: linear-gradient(135deg, #b71c1c 0%, #ff7675 100%);
-            box-shadow: 0 4px 16px rgba(220,53,69,0.18);
-            color: #fff;
-        }
-        .navbar-toggler {
-            border-radius: 10px;
-            border: 1.5px solid #667eea;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        .navbar-toggler:hover, .navbar-toggler:focus {
-            border-color: #764ba2;
-            box-shadow: 0 2px 8px rgba(102,126,234,0.12);
-        }
+        function exportTableToPDF() {
+            try {
+                if (typeof jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+                    alert('PDF export libraries not loaded. Please refresh the page and try again.');
+                    return;
+                }
 
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
+                const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
+                const headers = ['Name','Company','Designation','Email','Phone','Website','Address','Additional Info'];
+                if (isAdmin) headers.push('Scanned By','Scanned Date');
 
-        .nav-brand {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #667eea;
-        }
+                // Build a temporary table using full allCards data
+                const tempTable = document.createElement('table');
+                tempTable.style.borderCollapse = 'collapse';
+                tempTable.style.width = '100%';
+                tempTable.style.fontSize = '10px';
 
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-        }
+                let thead = document.createElement('thead');
+                let headerRow = document.createElement('tr');
+                headers.forEach(h => {
+                    let th = document.createElement('th');
+                    th.style.border = '1px solid #ccc';
+                    th.style.padding = '6px';
+                    th.style.background = '#f8f9fa';
+                    th.textContent = h;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                tempTable.appendChild(thead);
 
-        .nav-tab {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 20px;
-            background: transparent;
-            color: #666;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
+                let tbody = document.createElement('tbody');
+                for (let card of allCards) {
+                    let tr = document.createElement('tr');
+                    const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : '';
+                    const cells = [
+                        card.name || '',
+                        card.company || '',
+                        card.designation || '',
+                        card.email || '',
+                        card.phone || '',
+                        card.website || '',
+                        card.address || '',
+                        card.additional_info || ''
+                    ];
+                    if (isAdmin) {
+                        cells.push(card.scanned_by || '');
+                        cells.push(scannedDate);
+                    }
+                    cells.forEach(c => {
+                        let td = document.createElement('td');
+                        td.style.border = '1px solid #ddd';
+                        td.style.padding = '6px';
+                        td.style.verticalAlign = 'top';
+                        td.textContent = c;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                }
+                tempTable.appendChild(tbody);
 
-        .nav-tab.active {
-            background: #667eea;
-            color: white;
-        }
+                // Wrap table in container with padding and border so PDF has safe margins
+                const tempContainer = document.createElement('div');
+                tempContainer.style.background = '#ffffff';
+                tempContainer.style.padding = '20px';
+                tempContainer.style.border = '1px solid #ccc';
+                tempContainer.style.display = 'inline-block';
+                tempContainer.appendChild(tempTable);
 
-        .nav-tab:hover {
-            background: #f0f2ff;
-            color: #667eea;
-        }
+                // Position off-screen for rendering
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '0';
+                document.body.appendChild(tempContainer);
 
-        .nav-tab.active:hover {
-            background: #5a6fd8;
-        }
+                html2canvas(tempContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff'
+                }).then(canvas => {
+                    document.body.removeChild(tempContainer);
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jspdf.jsPDF('l', 'pt', 'a4');
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    const margin = 20; // safe margin on all sides
+                    const imgWidth = pageWidth - margin * 2;
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
 
-        .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            background: rgba(255,255,255,0.6);
-            border-radius: 28px;
-            box-shadow: 0 16px 48px rgba(0,0,0,0.18), 0 2px 12px rgba(102,126,234,0.10);
-            overflow: hidden;
-            backdrop-filter: blur(8px);
-            padding: 0;
-        }
+                    if (imgHeight <= pageHeight - margin * 2) {
+                        // Single page
+                        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+                    } else {
+                        // Multi-page: slice the canvas vertically into page-sized chunks
+                        const pageCanvas = document.createElement('canvas');
+                        const pageCtx = pageCanvas.getContext('2d');
+                        const sliceHeight = Math.floor(canvas.width * (pageHeight - margin * 2) / imgWidth);
+                        pageCanvas.width = canvas.width;
+                        pageCanvas.height = sliceHeight;
 
-        .header {
-            background: rgba(255,255,255,0.6) !important;
-            backdrop-filter: blur(6px);
-            color: #333 !important;
-            padding: 40px;
-            text-align: center;
-            border-radius: 20px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-        }
+                        let srcY = 0;
+                        while (srcY < canvas.height) {
+                            pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+                            pageCtx.drawImage(canvas, 0, srcY, canvas.width, sliceHeight, 0, 0, pageCanvas.width, pageCanvas.height);
+                            const pageData = pageCanvas.toDataURL('image/png');
+                            const pageImgHeight = pageCanvas.height * imgWidth / pageCanvas.width;
+                            pdf.addImage(pageData, 'PNG', margin, margin, imgWidth, pageImgHeight);
+                            srcY += sliceHeight;
+                            if (srcY < canvas.height) pdf.addPage();
+                        }
+                    }
+                    pdf.save('cards.pdf');
+                }).catch(error => {
+                    console.error('PDF generation error:', error);
+                    alert('Error generating PDF: ' + error.message);
+                    if (document.body.contains(tempContainer)) document.body.removeChild(tempContainer);
+                });
 
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            } catch (error) {
+                console.error('PDF export error:', error);
+                alert('Error exporting PDF: ' + error.message);
+            }
+        }
             font-weight: 300;
         }
 
@@ -834,21 +835,28 @@
             <li class="nav-item">
               <a class="nav-link" id="uploadNav" href="#" onclick="showSection('upload', event); setActiveNav('uploadNav')">Upload</a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">All Cards</a>
-            </li>
+                        <li class="nav-item">
+                            {% if session.get('role') == 'admin' %}
+                                <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">All Cards</a>
+                            {% else %}
+                                <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">Shared Cards</a>
+                            {% endif %}
+                        </li>
             {% if session['user'] and session['user'] != 'c4i4.lab@c4i4.com' %}
             <li class="nav-item">
               <a class="nav-link" id="personalCardsNav" href="#" onclick="showSection('personalCards', event); setActiveNav('personalCardsNav')">Personal Cards</a>
             </li>
             {% endif %}
-                        {% if session.get('role') == 'admin' %}
-                        <li class="nav-item">
-                            <a class="nav-link" id="adminNav" href="/admin">Admin</a>
-                        </li>
-                        {% endif %}
+            {% if session.get('role') == 'admin' %}
+            <li class="nav-item">
+              <a class="nav-link" id="usersNav" href="#" onclick="showSection('users', event); setActiveNav('usersNav')">Users</a>
+            </li>
+            {% endif %}
           </ul>
-          <a href="/logout" class="btn btn-danger ms-lg-3">Sign Out</a>
+          <div class="d-flex align-items-center gap-3 ms-auto">
+            <span class="text-dark fw-500">👤 {{ session.get('name', 'User') }}</span>
+            <a href="/logout" class="btn btn-danger ms-lg-3">Sign Out</a>
+          </div>
         </div>
       </div>
     </nav>
@@ -900,23 +908,26 @@
 
             <!-- Cards Section -->
             <div id="cardsSection" class="cards-section" style="display: none;">
-                <h2 class="section-title">📋 All Scanned Cards</h2>
+                <h2 class="section-title">{% if session.get('role') == 'admin' %}📋 All Scanned Cards{% else %}📋 Shared Cards{% endif %}</h2>
                 <div class="mb-3" style="max-width: 350px; margin: 0 auto;">
                     <input type="text" id="cardSearchInput" class="form-control form-control-sm" placeholder="Search cards..." oninput="filterCardsTable()">
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover table-bordered table-sm align-middle" id="cardsTable" style="font-size: 0.92rem;">
+                <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
+                    <table class="table table-striped table-hover table-bordered table-sm align-middle" id="cardsTable" style="font-size: 0.80rem; margin-bottom: 0; white-space: nowrap;">
                         <thead class="table-dark">
                             <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Company</th>
-                                <th scope="col">Designation</th>
-                                <th scope="col">Email</th>
-                                <th scope="col">Phone</th>
-                                <th scope="col">Website</th>
-                                <th scope="col">Address</th>
-                                <th scope="col">Additional Info</th>
-                                <th scope="col">Actions</th>
+                                <th scope="col" style="min-width: 80px;">Name</th>
+                                <th scope="col" style="min-width: 100px;">Company</th>
+                                <th scope="col" style="min-width: 80px;">Designation</th>
+                                <th scope="col" style="min-width: 120px;">Email</th>
+                                <th scope="col" style="min-width: 90px;">Phone</th>
+                                <th scope="col" style="min-width: 100px;">Website</th>
+                                <th scope="col" style="min-width: 100px;">Address</th>
+                                {% if session.get('role') == 'admin' %}
+                                <th scope="col" style="min-width: 100px;">Scanned By</th>
+                                <th scope="col" style="min-width: 90px;">Date</th>
+                                {% endif %}
+                                <th scope="col" style="min-width: 100px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="cardsTableBody"></tbody>
@@ -957,6 +968,31 @@
                     <button class="btn btn-outline-primary btn-sm" onclick="exportPersonalTableToCSV()">Export CSV</button>
                     <button class="btn btn-outline-success btn-sm" onclick="exportPersonalTableToExcel()">Export Excel</button>
                     <button class="btn btn-outline-danger btn-sm" onclick="exportPersonalTableToPDF()">Export PDF</button>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Users Section (Admin Only) -->
+            {% if session.get('role') == 'admin' %}
+            <div id="usersSection" class="cards-section" style="display: none;">
+                <h2 class="section-title">👥 Registered Users</h2>
+                <div class="mb-3" style="max-width: 350px; margin: 0 auto;">
+                    <input type="text" id="userSearchInput" class="form-control form-control-sm" placeholder="Search users..." oninput="filterUsersTable()">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-bordered table-sm align-middle" id="usersTable" style="font-size: 0.92rem;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Employee ID</th>
+                                <th scope="col">Role</th>
+                                <th scope="col">Cards Scanned</th>
+                                <th scope="col">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
                 </div>
             </div>
             {% endif %}
@@ -1002,7 +1038,7 @@
                     <input type="text" class="form-input" id="editAdditionalInfo" name="additional_info">
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-danger" onclick="deleteCard()">Delete Card</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteCurrentCard()">Delete Card</button>
                     <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -1051,6 +1087,7 @@
             const cameraSection = document.getElementById('cameraSection');
             const cardsSection = document.getElementById('cardsSection');
             const personalCardsSection = document.getElementById('personalCardsSection');
+            const usersSection = document.getElementById('usersSection');
             const resultSection = document.getElementById('resultSection');
             const tabs = document.querySelectorAll('.nav-tab, .nav-link');
             // Only update tab highlighting if evt is present
@@ -1064,6 +1101,8 @@
                     document.getElementById('uploadNav').classList.add('active');
                 } else if (section === 'personalCards' && personalCardsSection) {
                     document.getElementById('personalCardsNav').classList.add('active');
+                } else if (section === 'users' && usersSection) {
+                    document.getElementById('usersNav').classList.add('active');
                 } else {
                     document.getElementById('cardsNav').classList.add('active');
                 }
@@ -1073,6 +1112,7 @@
             cameraSection.style.display = 'none';
             cardsSection.style.display = 'none';
             if (personalCardsSection) personalCardsSection.style.display = 'none';
+            if (usersSection) usersSection.style.display = 'none';
 
             if (section === 'upload') {
                 uploadSection.style.display = 'block';
@@ -1088,6 +1128,10 @@
             } else if (section === 'personalCards' && personalCardsSection) {
                 personalCardsSection.style.display = 'block';
                 loadPersonalCards();
+                document.body.classList.remove('upload-bg');
+            } else if (section === 'users' && usersSection) {
+                usersSection.style.display = 'block';
+                loadUsers();
                 document.body.classList.remove('upload-bg');
             } else {
                 cardsSection.style.display = 'block';
@@ -1471,25 +1515,44 @@
         function displayCards(cards) {
             const tableBody = document.getElementById('cardsTableBody');
             if (!tableBody) return;
+            const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
+            const colSpan = isAdmin ? '10' : '8';
             if (cards.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No cards found</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="' + colSpan + '" class="text-center text-muted">No cards found</td></tr>';
                 return;
             }
-            tableBody.innerHTML = cards.map(card => `
-                <tr>
-                    <td>${card.name || ''}</td>
-                    <td>${card.company || ''}</td>
-                    <td>${card.designation || ''}</td>
-                    <td>${card.email || ''}</td>
-                    <td>${card.phone || ''}</td>
-                    <td>${card.website || ''}</td>
-                    <td>${card.address || ''}</td>
-                    <td>${card.additional_info || ''}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="openEditModal('${card._id}')">Edit</button>
-                    </td>
-                </tr>
-            `).join('');
+
+            tableBody.innerHTML = cards.map(card => {
+                const email = card.email || '';
+                const emailHtml = email ? `<a href="mailto:${email}" style="color:#0d6efd; text-decoration:none;">${email}</a>` : '';
+                const websiteRaw = card.website ? String(card.website).trim() : '';
+                let websiteHtml = '';
+                if (websiteRaw) {
+                    const href = /^(https?:)?\/\//i.test(websiteRaw) ? (websiteRaw.startsWith('http') ? websiteRaw : 'http:' + websiteRaw) : 'http://' + websiteRaw;
+                    websiteHtml = `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:#0d6efd; text-decoration:none;">${websiteRaw}</a>`;
+                }
+
+                const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : 'N/A';
+
+                return `
+                    <tr>
+                        <td title="${card.name || ''}" style="max-width: 80px; overflow: hidden; text-overflow: ellipsis;">${card.name || ''}</td>
+                        <td title="${card.company || ''}" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${card.company || ''}</td>
+                        <td title="${card.designation || ''}" style="max-width: 80px; overflow: hidden; text-overflow: ellipsis;">${card.designation || ''}</td>
+                        <td title="${email}" style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${emailHtml}</td>
+                        <td title="${card.phone || ''}" style="max-width: 90px; overflow: hidden; text-overflow: ellipsis;">${card.phone || ''}</td>
+                        <td title="${websiteRaw}" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${websiteHtml}</td>
+                        <td title="${card.address || ''}" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${card.address || ''}</td>
+                        ${isAdmin ? `<td title="${card.scanned_by || 'N/A'}" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${card.scanned_by || 'N/A'}</td><td title="${scannedDate}" style="max-width: 90px;">${scannedDate}</td>` : ''}
+                        <td style="max-width: 100px;">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="openEditModal('${card._id}')">Edit</button>
+                                ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="deleteCard('${card._id}')">Delete</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // Edit Modal Functions
@@ -1515,6 +1578,81 @@
         function closeEditModal() {
             editModal.style.display = 'none';
             currentEditId = null;
+        }
+
+        // Delete card function
+        async function deleteCard(cardId) {
+            if (!confirm('Are you sure you want to delete this card?')) return;
+            
+            try {
+                const response = await fetch(`/delete_card/${cardId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Card deleted successfully');
+                    loadCards(); // Refresh the cards list
+                } else {
+                    alert('Failed to delete card: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting card: ' + error.message);
+            }
+        }
+
+        // Load users for admin
+        let allUsers = [];
+        async function loadUsers() {
+            try {
+                const response = await fetch('/admin/users');
+                const result = await response.json();
+                if (result.success) {
+                    allUsers = result.users;
+                    displayUsers(allUsers);
+                } else {
+                    document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Failed to load users</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Network error loading users</td></tr>';
+            }
+        }
+
+        function displayUsers(users) {
+            const tableBody = document.getElementById('usersTableBody');
+            if (!tableBody) return;
+            if (users.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No users found</td></tr>';
+                return;
+            }
+            tableBody.innerHTML = users.map(user => {
+                const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+                return `
+                    <tr>
+                        <td>${user.name || ''}</td>
+                        <td>${user.email || ''}</td>
+                        <td>${user.employee_id || 'N/A'}</td>
+                        <td>${user.role || 'user'}</td>
+                        <td><strong>${user.cards_scanned || 0}</strong></td>
+                        <td>${createdDate}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterUsersTable() {
+            const searchInput = document.getElementById('userSearchInput');
+            if (!searchInput) return;
+            const filter = searchInput.value.toLowerCase();
+            const filteredUsers = allUsers.filter(user => 
+                (user.name && user.name.toLowerCase().includes(filter)) ||
+                (user.email && user.email.toLowerCase().includes(filter)) ||
+                (user.employee_id && user.employee_id.toLowerCase().includes(filter))
+            );
+            displayUsers(filteredUsers);
         }
 
         // Close modal when clicking outside
@@ -1605,96 +1743,170 @@
         }
 
         function exportTableToCSV() {
-            let csv = [];
-            const rows = document.querySelectorAll("#cardsTable tr");
-            for (let row of rows) {
-                let cols = Array.from(row.querySelectorAll("th,td"))
-                    .slice(0, -1) // skip actions
-                    .map(td => `"${td.innerText.replace(/"/g, '""')}"`);
-                csv.push(cols.join(","));
+            const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
+            const headers = ['Name','Company','Designation','Email','Phone','Website','Address','Additional Info'];
+            if (isAdmin) headers.push('Scanned By','Scanned Date');
+
+            const rows = [headers.map(h => `"${h.replace(/"/g,'""')}"`).join(',')];
+            for (let card of allCards) {
+                const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : '';
+                const values = [
+                    card.name || '',
+                    card.company || '',
+                    card.designation || '',
+                    card.email || '',
+                    card.phone || '',
+                    card.website || '',
+                    card.address || '',
+                    card.additional_info || ''
+                ];
+                if (isAdmin) {
+                    values.push(card.scanned_by || '');
+                    values.push(scannedDate);
+                }
+                rows.push(values.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
             }
-            downloadCSV(csv.join("\n"), 'cards.csv');
+            downloadCSV(rows.join("\n"), 'cards.csv');
         }
         function downloadCSV(csv, filename) {
-            const csvFile = new Blob([csv], { type: "text/csv" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(csvFile);
-            link.download = filename;
+            const csvFile = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(csvFile);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
         function exportTableToExcel() {
-            let table = document.getElementById("cardsTable");
-            // Create a temporary table without the Actions column
-            let tempTable = table.cloneNode(true);
-            let rows = tempTable.querySelectorAll("tr");
-            rows.forEach(row => {
-                let cells = row.querySelectorAll("th, td");
-                if (cells.length > 0) {
-                    cells[cells.length - 1].remove(); // Remove the last cell (Actions column)
-                }
+            const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
+            const headers = ['Name','Company','Designation','Email','Phone','Website','Address','Additional Info'];
+            if (isAdmin) headers.push('Scanned By','Scanned Date');
+
+            let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table border="1"><tr>';
+            headers.forEach(h => {
+                html += `<th style="background:#f0f0f0;">${h}</th>`;
             });
+            html += '</tr>';
             
-            let html = tempTable.outerHTML.replace(/<a[^>]*>|<\/a>/g, ""); // Remove links
-            let url = 'data:application/vnd.ms-excel,' + encodeURIComponent(html);
-            let link = document.createElement("a");
-            link.href = url;
-            link.download = "cards.xls";
+            for (let card of allCards) {
+                const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : '';
+                const cells = [
+                    card.name || '',
+                    card.company || '',
+                    card.designation || '',
+                    card.email || '',
+                    card.phone || '',
+                    card.website || '',
+                    card.address || '',
+                    card.additional_info || ''
+                ];
+                if (isAdmin) {
+                    cells.push(card.scanned_by || '');
+                    cells.push(scannedDate);
+                }
+                html += '<tr>';
+                cells.forEach(c => {
+                    html += `<td>${String(c).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>`;
+                });
+                html += '</tr>';
+            }
+            html += '</table></body></html>';
+
+            const excelFile = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(excelFile);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'cards.xls');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
         function exportTableToPDF() {
             try {
-                // Check if required libraries are available
-                if (typeof jspdf === 'undefined') {
-                    alert('PDF library not loaded. Please refresh the page and try again.');
+                if (typeof jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+                    alert('PDF export libraries not loaded. Please refresh the page and try again.');
                     return;
                 }
-                
-                // Create a temporary table without the Actions column for PDF export
-                let table = document.getElementById("cardsTable");
-                if (!table) {
-                    alert('Table not found. Please make sure you are on the All Cards page.');
-                    return;
-                }
-                
-                let tempTable = table.cloneNode(true);
-                let rows = tempTable.querySelectorAll("tr");
-                rows.forEach(row => {
-                    let cells = row.querySelectorAll("th, td");
-                    if (cells.length > 0) {
-                        cells[cells.length - 1].remove(); // Remove the last cell (Actions column)
-                    }
+
+                const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
+                const headers = ['Name','Company','Designation','Email','Phone','Website','Address','Additional Info'];
+                if (isAdmin) headers.push('Scanned By','Scanned Date');
+
+                // Build a temporary table using full allCards data
+                const tempTable = document.createElement('table');
+                tempTable.style.borderCollapse = 'collapse';
+                tempTable.style.width = '100%';
+                tempTable.style.fontSize = '10px';
+
+                let thead = document.createElement('thead');
+                let headerRow = document.createElement('tr');
+                headers.forEach(h => {
+                    let th = document.createElement('th');
+                    th.style.border = '1px solid #ccc';
+                    th.style.padding = '4px';
+                    th.textContent = h;
+                    headerRow.appendChild(th);
                 });
-                
-                // Make sure the temporary table is visible for html2canvas
+                thead.appendChild(headerRow);
+                tempTable.appendChild(thead);
+
+                let tbody = document.createElement('tbody');
+                for (let card of allCards) {
+                    let tr = document.createElement('tr');
+                    const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : '';
+                    const cells = [
+                        card.name || '',
+                        card.company || '',
+                        card.designation || '',
+                        card.email || '',
+                        card.phone || '',
+                        card.website || '',
+                        card.address || '',
+                        card.additional_info || ''
+                    ];
+                    if (isAdmin) {
+                        cells.push(card.scanned_by || '');
+                        cells.push(scannedDate);
+                    }
+                    cells.forEach(c => {
+                        let td = document.createElement('td');
+                        td.style.border = '1px solid #ddd';
+                        td.style.padding = '4px';
+                        td.textContent = c;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                }
+                tempTable.appendChild(tbody);
+
+                // Position off-screen for rendering
                 tempTable.style.position = 'absolute';
                 tempTable.style.left = '-9999px';
                 tempTable.style.top = '0';
                 document.body.appendChild(tempTable);
-                
+
                 html2canvas(tempTable, {
                     scale: 2,
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#ffffff'
                 }).then(canvas => {
-                    // Remove the temporary table
                     document.body.removeChild(tempTable);
-                    
                     const imgData = canvas.toDataURL('image/png');
                     const pdf = new jspdf.jsPDF('l', 'pt', 'a4');
                     const pageWidth = pdf.internal.pageSize.getWidth();
                     const pageHeight = pdf.internal.pageSize.getHeight();
                     const imgWidth = pageWidth - 40;
                     const imgHeight = canvas.height * imgWidth / canvas.width;
-                    
-                    // Check if image height exceeds page height
+
                     if (imgHeight > pageHeight - 40) {
-                        // Split into multiple pages if needed
                         let heightLeft = imgHeight;
                         let position = 20;
                         pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
                         heightLeft -= (pageHeight - 40);
-                        
                         while (heightLeft >= 0) {
                             position = heightLeft - imgHeight + 20;
                             pdf.addPage();
@@ -1704,24 +1916,20 @@
                     } else {
                         pdf.addImage(imgData, 'PNG', 20, 20, imgWidth, imgHeight);
                     }
-                    
-                    pdf.save("cards.pdf");
+                    pdf.save('cards.pdf');
                 }).catch(error => {
                     console.error('PDF generation error:', error);
                     alert('Error generating PDF: ' + error.message);
-                    // Clean up temporary table if it exists
-                    if (document.body.contains(tempTable)) {
-                        document.body.removeChild(tempTable);
-                    }
+                    if (document.body.contains(tempTable)) document.body.removeChild(tempTable);
                 });
-                
+
             } catch (error) {
                 console.error('PDF export error:', error);
                 alert('Error exporting PDF: ' + error.message);
             }
         }
 
-        function deleteCard() {
+        function deleteCurrentCard() {
             if (!currentEditId) return;
             
             if (confirm('Are you sure you want to delete this card? This action cannot be undone.')) {

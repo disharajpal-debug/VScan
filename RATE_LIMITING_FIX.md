@@ -11,11 +11,13 @@ You received a **429 Too Many Requests** error. This means the Gemini API has ra
 Your application now has **automatic retry logic with exponential backoff**:
 
 1. **Automatic Retries**: If rate-limited, the app waits and retries automatically
+
    - First retry: waits 2 seconds
    - Second retry: waits 4 seconds
    - Third retry: waits 8 seconds
 
 2. **Better Error Messages**: Users see helpful messages like:
+
    - ⏳ "API rate limit reached. Please wait a few minutes and try again."
    - ❌ "The extraction service is temporarily unavailable"
 
@@ -26,6 +28,7 @@ Your application now has **automatic retry logic with exponential backoff**:
 ## 📊 Gemini API Rate Limits
 
 **Free Tier Limits:**
+
 - **Requests per minute**: 60 RPM
 - **Requests per day**: 1,500 RPD
 - **Tokens per minute**: 1,000,000 TPM
@@ -37,11 +40,13 @@ Your application now has **automatic retry logic with exponential backoff**:
 ## 💡 How to Avoid Rate Limiting
 
 ### Option 1: **Wait (Free & Easiest)**
+
 - Wait 1-2 minutes between card uploads
 - The app now retries automatically
 - No configuration needed
 
 ### Option 2: **Upgrade to Paid Plan**
+
 - Go to Google AI Studio: https://makersuite.google.com/app/apikey
 - Enable billing on your Google Cloud account
 - Higher limits:
@@ -49,6 +54,7 @@ Your application now has **automatic retry logic with exponential backoff**:
   - **10,000,000 TPM** (up from 1,000,000)
 
 ### Option 3: **Use a Different AI Service**
+
 - Claude (Anthropic)
 - OpenAI (GPT-4 Vision)
 - Azure Computer Vision
@@ -58,6 +64,7 @@ Your application now has **automatic retry logic with exponential backoff**:
 ## 🔧 Configuration Options
 
 ### Current Setup (in `.env`):
+
 ```bash
 GEMINI_MODEL=gemini-2.0-flash
 GEMINI_API_KEY=your_key_here
@@ -82,15 +89,18 @@ GEMINI_API_KEY=your_key_here
 ## 📝 Recommended Actions
 
 ### Immediate (Do Now):
+
 1. ✅ Your app already has automatic retries - **no action needed**
 2. Wait 2-3 minutes and try uploading again
 3. The automatic retry will work if API is temporarily limited
 
 ### Short Term (Next 30 minutes):
+
 - Upgrade to Gemini API paid tier if uploading many cards
 - Or space out uploads over time
 
 ### Long Term (This week):
+
 - Monitor usage in Google Cloud Console: https://console.cloud.google.com/
 - Set up billing alerts to know when approaching limits
 - Consider batching uploads or using a queuing system
@@ -123,16 +133,19 @@ GEMINI_API_KEY=your_key_here
 ### If Still Rate-Limited:
 
 **Option 1: Upgrade API Plan**
+
 - Go to Google Cloud Console
 - Enable billing
 - Wait 10-15 minutes for limits to increase
 - Try again
 
 **Option 2: Use Different Service**
+
 - Switch to Claude or OpenAI (requires code changes)
 - Each has their own free quota
 
 **Option 3: Wait Until Tomorrow**
+
 - Daily limit (1,500 RPD) resets at midnight UTC
 - You'll have 1,500 new requests then
 
@@ -173,29 +186,32 @@ GEMINI_API_KEY=your_key_here
 
 ### Error Messages You Might See:
 
-| Message | Meaning | Solution |
-|---------|---------|----------|
-| ⏳ "Rate limit reached" | Too many requests | Wait 2-3 min, retry |
-| ❌ "Service unavailable" | API down temporarily | Try again in 5 min |
-| 🔄 "Failed after 3 retries" | Persistent issue | Upgrade plan or wait |
-| ❌ "Network error" | Connection issue | Check internet |
+| Message                     | Meaning              | Solution             |
+| --------------------------- | -------------------- | -------------------- |
+| ⏳ "Rate limit reached"     | Too many requests    | Wait 2-3 min, retry  |
+| ❌ "Service unavailable"    | API down temporarily | Try again in 5 min   |
+| 🔄 "Failed after 3 retries" | Persistent issue     | Upgrade plan or wait |
+| ❌ "Network error"          | Connection issue     | Check internet       |
 
 ---
 
 ## 💰 Pricing Information
 
 **Gemini API - Free Tier:**
+
 - 60 requests per minute
 - 1,500 requests per day
 - Cost: **$0/month**
 
 **Gemini API - Paid Plan:**
+
 - $0.075 per 1000 input tokens
 - $0.30 per 1000 output tokens
 - Cost: ~$0.001 per card (estimate)
 - Start with **$300/month free credit**
 
 **Compare to:**
+
 - Claude: $0.003 input / $0.015 output (per 1K tokens)
 - OpenAI GPT-4V: $0.01 input / $0.03 output (per 1K tokens)
 
@@ -217,4 +233,3 @@ To confirm the retry logic is working:
 
 **Last Updated:** November 24, 2025
 **Status:** ✅ Retry Logic Implemented
-

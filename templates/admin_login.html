@@ -20,10 +20,15 @@
         {% endif %}
       {% endwith %}
 
-      <form method="post">
+      <form method="post" autocomplete="off" id="adminLoginForm">
+        <!-- Hidden real field to post server-expected name; visible field uses non-standard name to avoid autofill -->
+        <input type="hidden" name="email" id="hidden_admin_email" value="" autocomplete="off">
+        <!-- Hidden dummy fields to reduce browser autofill of admin credentials -->
+        <input type="text" name="fakeusernameremembered_admin" id="fakeusernameremembered_admin" style="display:none" >
+        <input type="password" name="fakepasswordremembered_admin" id="fakepasswordremembered_admin" style="display:none" >
         <div class="form-group">
-          <label for="email">Email (optional)</label>
-          <input type="email" id="email" name="email" class="form-control" placeholder="admin@example.com">
+          <label for="email_visible">Email (optional)</label>
+          <input type="email" id="email_visible" name="email_visible" class="form-control" autocomplete="off" value="">
         </div>
         <div class="form-group">
           <label for="token">Admin Token</label>
@@ -35,5 +40,30 @@
         </div>
       </form>
     </div>
+      <script>
+      // Clear any browser autofill values on page load to avoid showing saved admin credentials
+      window.addEventListener('DOMContentLoaded', function() {
+        try {
+          const email = document.getElementById('email_visible');
+          if (email) email.value = '';
+          const token = document.getElementById('token');
+          if (token) token.value = '';
+        } catch (e) {
+          // ignore
+        }
+      });
+    </script>
+  <script>
+    // Copy visible admin email into hidden 'email' before submitting so server receives expected field
+    document.getElementById('adminLoginForm')?.addEventListener('submit', function() {
+      try {
+        const vis = document.getElementById('email_visible');
+        const hid = document.getElementById('hidden_admin_email');
+        if (vis && hid) hid.value = vis.value.trim();
+      } catch (e) {
+        // ignore
+      }
+    });
+  </script>
   </body>
 </html>

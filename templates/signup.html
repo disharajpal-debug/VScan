@@ -207,9 +207,16 @@
           </div>
         </div>
         <div class="password-requirements mb-2">
-          <span class="password-badge" id="password-requirements-msg">
-            Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.
-          </span>
+          <div id="password-requirements-box" class="password-badge" style="display:block;">
+            <strong>Password requirements:</strong>
+            <ul style="margin:6px 0 0 18px; color:#01579b;">
+              <li><input type="checkbox" id="chk-length" disabled> At least 8 characters</li>
+              <li><input type="checkbox" id="chk-upper" disabled> An uppercase letter (A-Z)</li>
+              <li><input type="checkbox" id="chk-lower" disabled> A lowercase letter (a-z)</li>
+              <li><input type="checkbox" id="chk-digit" disabled> A digit (0-9)</li>
+              <li><input type="checkbox" id="chk-special" disabled> A special character (e.g. !@#$%^&*)</li>
+            </ul>
+          </div>
         </div>
         <div class="mb-3 position-relative">
           <label for="confirm_password" class="form-label">Confirm Password</label>
@@ -241,37 +248,111 @@
       passwordInput.type = type;
       confirmPasswordInput.type = type;
     });
-    // Password strength bar logic (from script.js)
+
+    // Password strength bar logic (from script.js) and checkbox indicators
     let power = document.getElementById("power-point");
-    passwordInput.oninput = function () {
-        let point = 0;
-        let value = passwordInput.value;
-        let widthPower = ["1%", "25%", "50%", "75%", "100%"];
-        let colorPower = ["#D73F40", "#DC6551", "#F2B84F", "#BDE952", "#3ba62f"];
-        if (value.length >= 6) {
-            let arrayTest = [/[0-9]/, /[a-z]/, /[A-Z]/, /[^0-9a-zA-Z]/];
-            arrayTest.forEach((item) => {
-                if (item.test(value)) {
-                    point += 1;
-                }
-            });
-        }
-        power.style.width = widthPower[point];
-        power.style.backgroundColor = colorPower[point];
-    };
+    const chkLength = document.getElementById('chk-length');
+    const chkUpper = document.getElementById('chk-upper');
+    const chkLower = document.getElementById('chk-lower');
+    const chkDigit = document.getElementById('chk-digit');
+    const chkSpecial = document.getElementById('chk-special');
+
+    function evaluatePassword(value){
+      const checks = {
+        length: value.length >= 8,
+        upper: /[A-Z]/.test(value),
+        lower: /[a-z]/.test(value),
+        digit: /\d/.test(value),
+        special: /[^A-Za-z0-9]/.test(value)
+      };
+
+      // update checkboxes
+      chkLength.checked = checks.length;
+      chkUpper.checked = checks.upper;
+      chkLower.checked = checks.lower;
+      chkDigit.checked = checks.digit;
+      chkSpecial.checked = checks.special;
+
+      // update strength bar
+      let score = Object.values(checks).reduce((s,v)=> s + (v?1:0), 0);
+      let widthPower = ["1%","20%","45%","70%","100%","100%"];
+      let colorPower = ["#D73F40","#DC6551","#F2B84F","#BDE952","#3ba62f","#3ba62f"];
+      power.style.width = widthPower[score];
+      power.style.backgroundColor = colorPower[score];
+
+      return checks;
+    }
+
+    passwordInput.addEventListener('input', function(){
+      const checks = evaluatePassword(passwordInput.value);
+      checkPasswordMatch();
+    });
+
+    // Password match feedback (keep existing behavior)
+    const passwordMatchMsg = document.getElementById('password-match-msg');
+    function checkPasswordMatch() {
+      const pwd = passwordInput.value;
+      const cpwd = confirmPasswordInput.value;
+      if (!cpwd) {
+        passwordMatchMsg.style.display = 'none';
+        return;
+      }
+      passwordMatchMsg.style.display = 'block';
+      if (pwd === cpwd) {
+        passwordMatchMsg.textContent = 'Passwords match';
+        passwordMatchMsg.style.color = '#256029';
+        passwordMatchMsg.style.background = '#d4edda';
+      } else {
+        passwordMatchMsg.textContent = 'Passwords do not match';
+        passwordMatchMsg.style.color = '#842029';
+        passwordMatchMsg.style.background = '#f8d7da';
+      }
+    }
+    passwordInput.addEventListener('input', checkPasswordMatch);
+    confirmPasswordInput.addEventListener('input', checkPasswordMatch);
   </script>
   <script>
-    // Automatically hide Bootstrap toasts after 2 seconds (2000 ms)
+    // Make flashed toasts persistent until user clicks OK
     document.querySelectorAll('.toast').forEach(function(toastEl) {
-      setTimeout(function() {
-        if (typeof bootstrap !== 'undefined') {
-          var toast = bootstrap.Toast.getOrCreateInstance(toastEl);
-          toast.hide();
-        } else {
-          toastEl.classList.remove('show');
-        }
-      }, 2000);
+      // if it already contains a button, skip
+      if (!toastEl.querySelector('.toast-ok')){
+        const btnWrap = document.createElement('div');
+        btnWrap.className = 'ms-2';
+        const ok = document.createElement('button');
+        ok.type = 'button';
+        ok.className = 'btn btn-sm btn-light toast-ok';
+        ok.textContent = 'OK';
+        btnWrap.appendChild(ok);
+        toastEl.querySelector('.d-flex').appendChild(btnWrap);
+        ok.addEventListener('click', function(){ toastEl.remove(); });
+      }
     });
+
+    // Prevent form submission until password requirements met and passwords match
+    const signupForm = document.querySelector('form');
+    signupForm.addEventListener('submit', function(e){
+      const checks = evaluatePassword(passwordInput.value);
+      const allOk = checks.length && checks.upper && checks.lower && checks.digit && checks.special;
+      if (!allOk) {
+        e.preventDefault();
+        showPersistentError('Password does not meet requirements. Please fix the highlighted items.');
+        return;
+      }
+      if (passwordInput.value !== confirmPasswordInput.value) {
+        e.preventDefault();
+        showPersistentError('Passwords do not match.');
+        return;
+      }
+    });
+
+    function showPersistentError(msg){
+      const container = document.querySelector('.position-fixed.top-0.start-50');
+      const toast = document.createElement('div');
+      toast.className = 'toast show align-items-center text-bg-danger border-0 mb-2';
+      toast.innerHTML = '<div class="d-flex w-100 align-items-start"><div class="toast-body flex-grow-1">'+msg+'</div><div class="ms-2"><button type="button" class="btn btn-sm btn-light toast-ok">OK</button></div></div>';
+      container.prepend(toast);
+      toast.querySelector('.toast-ok').addEventListener('click', function(){ toast.remove(); });
+    }
   </script>
   <script>
     // Show/hide password requirements message on password input focus/typing

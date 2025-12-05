@@ -7,6 +7,7 @@ from flask import (
     url_for,
     session,
     flash,
+    make_response,
 )
 from flask_cors import CORS
 import os
@@ -23,6 +24,8 @@ import re
 import secrets
 import smtplib
 import time
+import csv
+import io
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -30,6 +33,13 @@ from google_sheets_integration import append_to_master_sheet
 
 # Load environment variables
 load_dotenv()
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
 
 app = Flask(__name__)
 # Secure Flask secret key from environment
@@ -53,9 +63,16 @@ if not GEMINI_API_KEY:
 
 
 # MongoDB configuration - Load from environment
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
+# MongoDB configuration - MUST come from environment on Render
+MONGO_URI = os.environ.get("MONGO_URI")
 DB_NAME = os.environ.get("DATABASE_NAME", "visiting_card")
 COLLECTION_NAME = os.environ.get("DB_COLLECTION_NAME", "cards")
+
+if not MONGO_URI:
+    raise Exception(
+        "❌ MONGO_URI is not set! Add it in Render Dashboard → Environment."
+    )
+
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -76,7 +93,11 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "your_email_password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "your_email@example.com")
 
 # Privileged user for special features
-PRIVILEGED_USER = os.environ.get("PRIVILEGED_USER", "ashutosh.lab@c4i4.com")
+PRIVILEGED_USER = os.environ.get("PRIVILEGED_USER", "disha.rajpal@c4i4.com")
+
+# Static admin credentials (unchangeable - set in .env)
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@c4i4.org").lower()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "AdminPass123!")
 
 # Roles
 ROLE_ADMIN = "admin"
@@ -304,7 +325,7 @@ def login():
         return redirect(url_for("index"))
 
     if request.method == "POST":
-        login_input = request.form.get("email", "").strip()
+        login_input = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
         # Validate form fields
@@ -312,20 +333,26 @@ def login():
             flash("Email/Employee ID and password are required.", "danger")
             return render_template("login.html")
 
-        # Determine if input is email or employee ID
+        # Check for static admin login first
+        if login_input == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            session["user"] = ADMIN_EMAIL
+            session["role"] = ROLE_ADMIN
+            session["name"] = "Administrator"
+            session["show_welcome_modal"] = True
+            session.permanent = False
+            return redirect(url_for("admin_dashboard"))
+
+        # Regular user login (database)
         user = None
         if "@" in login_input:
             user = get_user_by_email(login_input)
         else:
             user = get_user_by_employee_id(login_input)
 
-        # Verify user exists and password is correct
         if user and bcrypt.check_password_hash(user["password"], password):
             session["user"] = user["email"]
             session["role"] = user.get("role", ROLE_USER)
-            session["name"] = user.get("name", "")
-            session["show_welcome_modal"] = True
-            session.permanent = False  # Ensure session cookie is not persistent
+            session["name"] = user.get("name", "User")
             return redirect(url_for("index"))
         else:
             flash("Invalid email/employee ID or password", "danger")
@@ -493,24 +520,97 @@ def upload_file():
 def get_cards():
     """Get cards visible to the current user"""
     try:
-        # Show cards shared by users or scanned by the privileged user
-        # Admin sees all cards; regular users see shared or privileged-user cards
+        # Allow admin to filter by who scanned the card via query param `scanned_by`
+        scanned_by = request.args.get("scanned_by")
+
+        # Admin: can see all cards, or filtered by scanned_by
         if session.get("role") == ROLE_ADMIN:
-            cards = list(collection.find({}))
+            query = {}
+            if scanned_by:
+                query["scanned_by"] = scanned_by
+            cards = list(collection.find(query))
         else:
+            # Regular users: show cards shared by privileged user or explicitly shared
             query = {"$or": [{"scanned_by": PRIVILEGED_USER}, {"shared": True}]}
             cards = list(collection.find(query))
             # Extra safeguard: filter in Python as well
             cards = [
                 card
                 for card in cards
-                if card.get("scanned_by") == PRIVILEGED_USER or card.get("shared") is True
+                if card.get("scanned_by") == PRIVILEGED_USER
+                or card.get("shared") is True
             ]
+
+        # Normalize results for JSON (ObjectId -> str, datetime -> isoformat)
         for card in cards:
             card["_id"] = str(card["_id"])
+            if card.get("uploaded_at") and hasattr(
+                card.get("uploaded_at"), "isoformat"
+            ):
+                try:
+                    card["uploaded_at"] = card["uploaded_at"].isoformat()
+                except Exception:
+                    pass
         return jsonify({"success": True, "cards": cards})
     except Exception as e:
         return jsonify({"error": f"Failed to fetch cards: {str(e)}"}), 500
+
+
+@app.route("/admin/scanners")
+@login_required
+@admin_required
+def admin_scanners():
+    """Return distinct scanner identities (email + name if available) for admin filter dropdown"""
+    try:
+        scanners = collection.distinct("scanned_by")
+        result = []
+        for s in scanners:
+            if not s:
+                continue
+            user = users_collection.find_one({"email": s})
+            name = None
+            if user:
+                name = user.get("name")
+            result.append({"email": s, "name": name or s})
+        return jsonify({"success": True, "scanners": result})
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch scanners: {str(e)}"}), 500
+
+
+@app.route("/admin/scanner")
+@login_required
+@admin_required
+def admin_scanner_redirect():
+    """Compatibility redirect: singular -> plural endpoint"""
+    return redirect(url_for("admin_scanners"))
+
+
+@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    """Return all registered users with card count (admin only)"""
+    try:
+        users = list(users_collection.find({}, {"password": 0}))
+        # Convert ObjectId to string and datetime to isoformat, add card count
+        for user in users:
+            user["_id"] = str(user.get("_id", ""))
+            if user.get("created_at") and hasattr(user.get("created_at"), "isoformat"):
+                try:
+                    user["created_at"] = user["created_at"].isoformat()
+                except Exception:
+                    pass
+            # Count cards scanned by this user (match by user name stored in scanned_by field)
+            user_name = user.get("name", "")
+            cards_count = (
+                collection.count_documents({"scanned_by": user_name})
+                if user_name
+                else 0
+            )
+            user["cards_scanned"] = cards_count
+        return jsonify({"success": True, "users": users})
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch users: {str(e)}"}), 500
 
 
 @app.route("/update_card/<card_id>", methods=["PUT"])
@@ -622,6 +722,8 @@ def signup():
             "employee_id": employee_id,
             "email": email,
             "password": hashed_password,
+            "created_at": datetime.datetime.utcnow(),
+            "role": "user",
         }
         users_collection.insert_one(user)
         flash("Registration successful! Please log in.", "success")
@@ -630,99 +732,124 @@ def signup():
     return render_template("signup.html")
 
 
-def send_reset_email(to_email, reset_link):
-    subject = "Password Reset Request"
-    html_body = f"""
-    <html>
-    <body style='font-family: Arial, sans-serif; background: #f9f9f9; color: #222;'>
-      <div style='max-width: 480px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 32px;'>
-        <h2 style='color: #00bfae;'>Password Reset Request</h2>
-        <p>Hello,</p>
-        <p>You requested a password reset. Click the button below to reset your password:</p>
-        <p style='text-align: center; margin: 32px 0;'>
-          <a href='{reset_link}' target='_blank' style='display: inline-block; background: linear-gradient(90deg, #00ffc3 0%, #00d9a5 100%); color: #222; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.10);'>
-            Reset Password
-          </a>
-        </p>
-        <p>If you did not request this, please ignore this email.</p>
-        <p style='color: #888; font-size: 0.95em;'>Thanks,<br>Visiting Card Reader Team</p>
-      </div>
-    </body>
-    </html>
-    """
-    msg = MIMEMultipart("alternative")
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-        return False
-
-
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
+    # New flow: user submits their email, then is immediately shown a form
+    # to choose a new password (no external email is sent).
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
+
+        # Prevent admin from resetting password through this endpoint
+        if email == ADMIN_EMAIL:
+            flash(
+                "Admin password cannot be reset through this form. Please contact system administrator.",
+                "danger",
+            )
+            return render_template("forgot_password.html")
+
         user = get_user_by_email(email)
         if not user:
             flash("No account found with that email.", "danger")
             return render_template("forgot_password.html")
-        # Generate a secure token
-        token = secrets.token_urlsafe(32)
-        reset_tokens[email] = token
-        # Send reset link via email
-        reset_link = url_for("reset_password", token=token, _external=True)
-        email_sent = send_reset_email(email, reset_link)
-        if email_sent:
-            flash(
-                "A password reset link has been sent to your email address.", "success"
-            )
-        else:
-            flash("Failed to send reset email. Please try again later.", "danger")
-        return render_template("forgot_password.html")
+
+        # Render the reset-password form where user will enter new password
+        return render_template("reset_password.html", email=email)
+
     return render_template("forgot_password.html")
 
 
-@app.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    # Find email by token
-    email = None
-    for k, v in reset_tokens.items():
-        if v == token:
-            email = k
-            break
-    if not email:
-        flash("Invalid or expired reset link.", "danger")
-        return redirect(url_for("login"))
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    # Handle password update after user submits new password
+    email = request.form.get("email", "").strip().lower()
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    # Basic validations
+    if not email or not new_password or not confirm_password:
+        flash("All fields are required.", "danger")
+        return render_template("reset_password.html", email=email)
+
+    if new_password != confirm_password:
+        flash("New passwords do not match.", "danger")
+        return render_template("reset_password.html", email=email)
+
+    if not is_strong_password(new_password):
+        flash(
+            "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.",
+            "danger",
+        )
+        return render_template("reset_password.html", email=email)
+
+    # Prevent changing admin via this flow
+    if email == ADMIN_EMAIL:
+        flash(
+            "Admin password cannot be reset through this form. Please contact system administrator.",
+            "danger",
+        )
+        return redirect(url_for("forgot_password"))
+
+    user = get_user_by_email(email)
+    if not user:
+        flash("No account found with that email.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    # Hash and update
+    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    users_collection.update_one(
+        {"email": email}, {"$set": {"password": hashed_password}}
+    )
+
+    flash("Password changed successfully! Please log in.", "success")
+    return redirect(url_for("login"))
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """Allow logged-in users to change their password"""
     if request.method == "POST":
-        password = request.form.get("password", "")
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
         confirm_password = request.form.get("confirm_password", "")
-        if not password or not confirm_password:
+
+        user_email = session.get("user")
+        user = get_user_by_email(user_email)
+
+        if not user:
+            flash("User not found.", "danger")
+            return render_template("change_password.html")
+
+        # Verify current password
+        if not bcrypt.check_password_hash(user.get("password", ""), current_password):
+            flash("Current password is incorrect.", "danger")
+            return render_template("change_password.html")
+
+        if not new_password or not confirm_password:
             flash("All fields are required.", "danger")
-            return render_template("reset_password.html")
-        if password != confirm_password:
-            flash("Passwords do not match.", "danger")
-            return render_template("reset_password.html")
-        if not is_strong_password(password):
+            return render_template("change_password.html")
+
+        if new_password != confirm_password:
+            flash("New passwords do not match.", "danger")
+            return render_template("change_password.html")
+
+        if not is_strong_password(new_password):
             flash(
                 "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.",
                 "danger",
             )
-            return render_template("reset_password.html")
-        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+            return render_template("change_password.html")
+
+        # Update password in database
+        hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
         users_collection.update_one(
-            {"email": email}, {"$set": {"password": hashed_password}}
+            {"email": user_email}, {"$set": {"password": hashed_password}}
         )
-        reset_tokens.pop(email, None)
-        return redirect(url_for("login", reset=1))
-    return render_template("reset_password.html")
+
+        flash("Password changed successfully!", "success")
+        return redirect(url_for("login"))
+
+    return render_template("change_password.html")
 
 
 @app.route("/personal-cards")
@@ -755,8 +882,12 @@ def share_card(card_id):
         if not card:
             return jsonify({"error": "Card not found"}), 404
         user_email = session.get("user")
-        if card.get("scanned_by") != user_email:
+        user_role = session.get("role", ROLE_USER)
+
+        # Allow admins to share any card, or users to share their own cards
+        if user_role != ROLE_ADMIN and card.get("scanned_by") != user_email:
             return jsonify({"error": "Unauthorized"}), 403
+
         new_shared = not card.get("shared", False)
         collection.update_one(
             {"_id": ObjectId(card_id)}, {"$set": {"shared": new_shared}}
@@ -764,6 +895,284 @@ def share_card(card_id):
         return jsonify({"success": True, "shared": new_shared})
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+
+@app.route("/admin/export_csv")
+@login_required
+@admin_required
+def admin_export_csv():
+    """Export all cards as CSV (admin only)"""
+    try:
+        # Allow exporting filtered by scanner when `scanned_by` query param is present
+        scanned_by = request.args.get("scanned_by")
+        query = {}
+        if scanned_by:
+            query["scanned_by"] = scanned_by
+        cards = list(collection.find(query))
+
+        # Prepare CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        headers = [
+            "Name",
+            "Company",
+            "Designation",
+            "Email",
+            "Phone",
+            "Website",
+            "Address",
+            "Additional Info",
+            "Scanned By",
+            "Shared",
+            "Uploaded At",
+        ]
+        writer.writerow(headers)
+
+        for c in cards:
+            uploaded_str = ""
+            if c.get("uploaded_at"):
+                try:
+                    uploaded_str = c.get("uploaded_at").isoformat()
+                except Exception:
+                    uploaded_str = str(c.get("uploaded_at"))
+            row = [
+                c.get("name", ""),
+                c.get("company", ""),
+                c.get("designation", ""),
+                c.get("email", ""),
+                c.get("phone", ""),
+                c.get("website", ""),
+                c.get("address", ""),
+                c.get("additional_info", ""),
+                c.get("scanned_by", ""),
+                "Yes" if c.get("shared") else "No",
+                uploaded_str,
+            ]
+            writer.writerow(row)
+
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=all_cards.csv"
+        response.headers["Content-Type"] = "text/csv"
+        return response
+    except Exception as e:
+        print(f"Export CSV error: {e}")
+        return jsonify({"error": f"Failed to export CSV: {str(e)}"}), 500
+
+
+@app.route("/admin/export_excel")
+@login_required
+@admin_required
+def admin_export_excel():
+    """Export all cards as Excel (admin only)"""
+    try:
+        cards = list(collection.find({}))
+
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Cards"
+
+        # Define headers
+        headers = [
+            "Name",
+            "Company",
+            "Designation",
+            "Email",
+            "Phone",
+            "Website",
+            "Address",
+            "Additional Info",
+            "Scanned By",
+            "Shared",
+            "Uploaded At",
+        ]
+
+        # Add header row with formatting
+        header_fill = PatternFill(
+            start_color="667eea", end_color="667eea", fill_type="solid"
+        )
+        header_font = Font(color="FFFFFF", bold=True)
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Add data rows
+        for row_num, card in enumerate(cards, 2):
+            uploaded_str = ""
+            if card.get("uploaded_at"):
+                try:
+                    uploaded_str = card.get("uploaded_at").isoformat()
+                except Exception:
+                    uploaded_str = str(card.get("uploaded_at"))
+
+            row_data = [
+                card.get("name", ""),
+                card.get("company", ""),
+                card.get("designation", ""),
+                card.get("email", ""),
+                card.get("phone", ""),
+                card.get("website", ""),
+                card.get("address", ""),
+                card.get("additional_info", ""),
+                card.get("scanned_by", ""),
+                "Yes" if card.get("shared") else "No",
+                uploaded_str,
+            ]
+
+            for col_num, value in enumerate(row_data, 1):
+                ws.cell(row=row_num, column=col_num).value = value
+
+        # Adjust column widths
+        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["B"].width = 25
+        ws.column_dimensions["C"].width = 20
+        ws.column_dimensions["D"].width = 25
+        ws.column_dimensions["E"].width = 15
+        ws.column_dimensions["F"].width = 20
+        ws.column_dimensions["G"].width = 30
+        ws.column_dimensions["H"].width = 25
+        ws.column_dimensions["I"].width = 20
+        ws.column_dimensions["J"].width = 10
+        ws.column_dimensions["K"].width = 20
+
+        # Save to bytes
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=all_cards.xlsx"
+        response.headers["Content-Type"] = (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        return response
+    except Exception as e:
+        print(f"Export Excel error: {e}")
+        return jsonify({"error": f"Failed to export Excel: {str(e)}"}), 500
+
+
+@app.route("/admin/export_pdf")
+@login_required
+@admin_required
+def admin_export_pdf():
+    """Export all cards as PDF (admin only)"""
+    try:
+        cards = list(collection.find({}))
+
+        # Create PDF document
+        output = io.BytesIO()
+        pdf_doc = SimpleDocTemplate(
+            output,
+            pagesize=letter,
+            topMargin=0.4 * inch,
+            bottomMargin=0.4 * inch,
+            leftMargin=0.4 * inch,
+            rightMargin=0.4 * inch,
+        )
+
+        # Title
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=16,
+            textColor=colors.HexColor("#667eea"),
+            spaceAfter=4,
+            alignment=1,  # Center
+        )
+
+        story = [
+            Paragraph("Visiting Cards Report", title_style),
+            Paragraph(f"Total Cards: {len(cards)}", styles["Normal"]),
+            Spacer(1, 0.1 * inch),
+        ]
+
+        # Prepare table data - use text strings for simpler rendering
+        headers = ["Name", "Company", "Email", "Phone", "Scanned By", "Shared"]
+        table_data = [headers]
+
+        for card in cards:
+            row = [
+                str(card.get("name", "N/A"))[:50],
+                str(card.get("company", "N/A"))[:40],
+                str(card.get("email", "N/A"))[:45],
+                str(card.get("phone", "N/A"))[:20],
+                str(card.get("scanned_by", "N/A"))[:30],
+                "Yes" if card.get("shared") else "No",
+            ]
+            table_data.append(row)
+
+        # Create table with proper column widths
+        pdf_table = Table(
+            table_data,
+            colWidths=[
+                1.0 * inch,
+                1.2 * inch,
+                1.5 * inch,
+                1.0 * inch,
+                1.3 * inch,
+                0.6 * inch,
+            ],
+        )
+
+        # Enhanced table styling with proper spacing and wrapping support
+        table_style = TableStyle(
+            [
+                # Header styling
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#667eea")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 8),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, 0), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+                # Data rows styling
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 1), (-1, -1), 6),
+                ("ALIGN", (0, 1), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 1), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 1), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 3),
+                ("LEFTPADDING", (0, 1), (-1, -1), 2),
+                ("RIGHTPADDING", (0, 1), (-1, -1), 2),
+                # Grid lines
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#f5f5f5")],
+                ),
+                # Center align the "Shared" column
+                ("ALIGN", (5, 1), (5, -1), "CENTER"),
+                # Minimum height for rows
+                ("MINHEIGHT", (0, 1), (-1, -1), 0.25 * inch),
+            ]
+        )
+
+        pdf_table.setStyle(table_style)
+        story.append(pdf_table)
+
+        # Build PDF
+        pdf_doc.build(story)
+        output.seek(0)
+
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=all_cards.pdf"
+        response.headers["Content-Type"] = "application/pdf"
+        return response
+    except Exception as e:
+        print(f"Export PDF error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to export PDF: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

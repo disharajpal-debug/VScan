@@ -160,15 +160,21 @@
                 <img src="/static/c4i4-logo.png" alt="C4i4 Lab Logo" style="max-width: 120px; width: 100%; height: auto;">
             </div>
             <h2 class="mb-4 text-center text-white">Login</h2>
-            <form method="POST">
+            <form method="POST" autocomplete="off" id="loginForm">
+                <!-- Real fields are posted via these hidden inputs to avoid browser autofill on visible fields -->
+                <input type="hidden" name="email" id="hidden_email" value="" autocomplete="off">
+                <input type="hidden" name="password" id="hidden_password" value="" autocomplete="off">
+                <!-- Hidden dummy fields to reduce autofill targeting visible inputs -->
+                <input type="text" name="fakeusernameremembered" id="fakeusernameremembered" style="display:none" autocomplete="username">
+                <input type="password" name="fakepasswordremembered" id="fakepasswordremembered" style="display:none" autocomplete="current-password">
                 <div class="mb-3 position-relative">
                     <label for="email" class="form-label">Email or Employee ID</label>
-                    <input type="text" class="form-control ps-5" id="email" name="email" required autofocus placeholder="Email or Employee ID">
+                    <input type="text" class="form-control ps-5" id="email_visible" name="email_visible" required autofocus placeholder="Email or Employee ID" autocomplete="off" value="">
                     <span class="icon-start">📧</span>
                 </div>
                 <div class="mb-3 position-relative">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control ps-5" id="password" name="password" required placeholder="Enter password">
+                    <input type="password" class="form-control ps-5" id="password_visible" name="password_visible" required placeholder="Enter password" autocomplete="new-password" value="">
                     <span class="icon-start">🔒</span>
                     <span class="icon-eye" id="togglePassword" style="position:absolute; right:16px; top:50%; transform:translateY(-50%); cursor:pointer; color:#00ffc3; font-size:1.4em;">
                         <i id="eyeIcon" class="bi bi-eye"></i>
@@ -192,19 +198,29 @@
 
     <!-- 🧠 Scripts -->
     <script>
-        const loginForm = document.querySelector("form");
+        const loginForm = document.getElementById("loginForm") || document.querySelector("form");
         const loginBtn = document.getElementById("loginBtn");
         const loginSpinner = document.getElementById("loginSpinner");
         const loginText = document.getElementById("loginText");
-
-        loginForm.addEventListener("submit", function () {
+        loginForm.addEventListener("submit", function (e) {
+            // Copy visible input values into hidden real inputs so server receives expected names
+            try {
+                const emailVis = document.getElementById('email_visible');
+                const passVis = document.getElementById('password_visible');
+                const hiddenEmail = document.getElementById('hidden_email');
+                const hiddenPass = document.getElementById('hidden_password');
+                if (hiddenEmail && emailVis) hiddenEmail.value = emailVis.value.trim();
+                if (hiddenPass && passVis) hiddenPass.value = passVis.value;
+            } catch (err) {
+                // ignore
+            }
             loginBtn.disabled = true;
             loginSpinner.classList.remove("d-none");
             loginText.textContent = "Logging in...";
         });
 
         // Show/hide password functionality with icon
-        const passwordInput = document.getElementById('password');
+        const passwordInput = document.getElementById('password_visible');
         const togglePassword = document.getElementById('togglePassword');
         const eyeIcon = document.getElementById('eyeIcon');
         if (togglePassword && passwordInput && eyeIcon) {
@@ -218,6 +234,19 @@
 
     <!-- Bootstrap Toast JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // Clear any values that the browser may have autofilled so credentials are not visible
+            window.addEventListener('DOMContentLoaded', function() {
+                try {
+                    const email = document.getElementById('email_visible');
+                    if (email) email.value = '';
+                    const password = document.getElementById('password_visible');
+                    if (password) password.value = '';
+                } catch (e) {
+                    // ignore
+                }
+            });
+        </script>
     <script>
       // Automatically hide Bootstrap toasts after 2 seconds (2000 ms)
       document.querySelectorAll('.toast').forEach(function(toastEl) {

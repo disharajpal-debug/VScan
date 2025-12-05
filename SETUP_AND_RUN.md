@@ -29,6 +29,7 @@ pip install -r requirements.txt
 ```
 
 This installs all required packages:
+
 - Flask 2.3.3
 - MongoDB driver
 - Google Sheets integration
@@ -71,6 +72,7 @@ SESSION_COOKIE_SECURE=False
 ```
 
 ### How to Get Gmail App Password:
+
 1. Enable 2-Factor Authentication on Google Account
 2. Go to https://myaccount.google.com/apppasswords
 3. Select "Mail" and "Windows Computer"
@@ -106,6 +108,7 @@ python back.py
 ```
 
 **Output should show:**
+
 ```
  * Serving Flask app 'back'
  * Debug mode: off
@@ -116,6 +119,7 @@ python back.py
 ### Access the Application:
 
 Open your browser and go to:
+
 ```
 http://localhost:5000
 ```
@@ -174,6 +178,7 @@ http://localhost:5000
 **Error:** `pymongo.errors.ServerSelectionTimeoutError`
 
 **Solution:**
+
 1. Check if MongoDB is running: `mongosh` or `mongo`
 2. If not installed, download from mongodb.com
 3. Update `MONGO_URI` in `.env` if running on different host/port
@@ -183,6 +188,7 @@ http://localhost:5000
 **Error:** `GEMINI_API_KEY not found in environment variables`
 
 **Solution:**
+
 1. Open `.env` file
 2. Verify `GEMINI_API_KEY` is set correctly
 3. Don't forget to save the file
@@ -208,6 +214,7 @@ taskkill /PID <PID> /F
 ### Issue: SMTP/Email Not Working
 
 **Check:**
+
 1. Gmail App Password is correct (not regular password)
 2. 2FA is enabled on Gmail account
 3. SMTP_SERVER and SMTP_PORT are correct
@@ -216,6 +223,7 @@ taskkill /PID <PID> /F
 ### Issue: Can't Extract Card Details
 
 **Check:**
+
 1. Image is clear and readable
 2. Image format is JPG, JPEG, or PNG
 3. File size is reasonable (under 10MB)
@@ -226,24 +234,24 @@ taskkill /PID <PID> /F
 
 ## Environment Variables Reference
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FLASK_ENV` | development | Flask environment mode |
-| `FLASK_SECRET_KEY` | - | Secret key for session encryption |
-| `GEMINI_API_KEY` | - | Google Gemini API key |
-| `GEMINI_MODEL` | gemini-2.0-flash | AI model to use |
-| `MONGO_URI` | mongodb://localhost:27017/ | MongoDB connection string |
-| `DATABASE_NAME` | visiting_card | Database name |
-| `DB_COLLECTION_NAME` | cards | Collection name |
-| `SMTP_SERVER` | smtp.example.com | Email server |
-| `SMTP_PORT` | 587 | Email server port |
-| `SMTP_USERNAME` | your_email@example.com | Email username |
-| `SMTP_PASSWORD` | - | Email password or app password |
-| `SENDER_EMAIL` | your_email@example.com | From email address |
-| `PRIVILEGED_USER` | ashutosh.lab@c4i4.com | Admin user email |
-| `SESSION_COOKIE_SECURE` | False | HTTPS only (True in production) |
-| `SESSION_COOKIE_HTTPONLY` | True | JavaScript cannot access cookie |
-| `SESSION_COOKIE_SAMESITE` | Lax | CSRF protection level |
+| Variable                  | Default                    | Description                       |
+| ------------------------- | -------------------------- | --------------------------------- |
+| `FLASK_ENV`               | development                | Flask environment mode            |
+| `FLASK_SECRET_KEY`        | -                          | Secret key for session encryption |
+| `GEMINI_API_KEY`          | -                          | Google Gemini API key             |
+| `GEMINI_MODEL`            | gemini-2.0-flash           | AI model to use                   |
+| `MONGO_URI`               | mongodb://localhost:27017/ | MongoDB connection string         |
+| `DATABASE_NAME`           | visiting_card              | Database name                     |
+| `DB_COLLECTION_NAME`      | cards                      | Collection name                   |
+| `SMTP_SERVER`             | smtp.example.com           | Email server                      |
+| `SMTP_PORT`               | 587                        | Email server port                 |
+| `SMTP_USERNAME`           | your_email@example.com     | Email username                    |
+| `SMTP_PASSWORD`           | -                          | Email password or app password    |
+| `SENDER_EMAIL`            | your_email@example.com     | From email address                |
+| `PRIVILEGED_USER`         | ashutosh.lab@c4i4.com      | Admin user email                  |
+| `SESSION_COOKIE_SECURE`   | False                      | HTTPS only (True in production)   |
+| `SESSION_COOKIE_HTTPONLY` | True                       | JavaScript cannot access cookie   |
+| `SESSION_COOKIE_SAMESITE` | Lax                        | CSRF protection level             |
 
 ---
 
@@ -252,12 +260,14 @@ taskkill /PID <PID> /F
 For production deployment:
 
 1. **Update `.env`:**
+
    ```bash
    FLASK_ENV=production
    SESSION_COOKIE_SECURE=True  # Requires HTTPS
    ```
 
 2. **Use Gunicorn instead of Flask:**
+
    ```powershell
    gunicorn -w 4 -b 0.0.0.0:5000 back:app
    ```
@@ -328,6 +338,7 @@ python back.py
 **Enable Debug Logging:**
 
 Edit `back.py` and change:
+
 ```python
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)  # Set debug=True
@@ -342,4 +353,3 @@ Logs will appear in the console where you ran `python back.py`
 **Last Updated:** November 24, 2025
 **Version:** 1.0
 **Status:** ✅ Ready for Development
-
