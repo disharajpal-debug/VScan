@@ -33,129 +33,6 @@
             top: 0;
             z-index: 1000;
             transition: box-shadow 0.3s, background 0.3s;
-        function exportTableToPDF() {
-            try {
-                if (typeof jspdf === 'undefined' || typeof html2canvas === 'undefined') {
-                    alert('PDF export libraries not loaded. Please refresh the page and try again.');
-                    return;
-                }
-
-                const isAdmin = document.documentElement.getAttribute('data-is-admin') === 'true';
-                const headers = ['Name','Company','Designation','Email','Phone','Website','Address','Additional Info'];
-                if (isAdmin) headers.push('Scanned By','Scanned Date');
-
-                // Build a temporary table using full allCards data
-                const tempTable = document.createElement('table');
-                tempTable.style.borderCollapse = 'collapse';
-                tempTable.style.width = '100%';
-                tempTable.style.fontSize = '10px';
-
-                let thead = document.createElement('thead');
-                let headerRow = document.createElement('tr');
-                headers.forEach(h => {
-                    let th = document.createElement('th');
-                    th.style.border = '1px solid #ccc';
-                    th.style.padding = '6px';
-                    th.style.background = '#f8f9fa';
-                    th.textContent = h;
-                    headerRow.appendChild(th);
-                });
-                thead.appendChild(headerRow);
-                tempTable.appendChild(thead);
-
-                let tbody = document.createElement('tbody');
-                for (let card of allCards) {
-                    let tr = document.createElement('tr');
-                    const scannedDate = card.uploaded_at ? new Date(card.uploaded_at).toLocaleDateString() : '';
-                    const cells = [
-                        card.name || '',
-                        card.company || '',
-                        card.designation || '',
-                        card.email || '',
-                        card.phone || '',
-                        card.website || '',
-                        card.address || '',
-                        card.additional_info || ''
-                    ];
-                    if (isAdmin) {
-                        cells.push(card.scanned_by || '');
-                        cells.push(scannedDate);
-                    }
-                    cells.forEach(c => {
-                        let td = document.createElement('td');
-                        td.style.border = '1px solid #ddd';
-                        td.style.padding = '6px';
-                        td.style.verticalAlign = 'top';
-                        td.textContent = c;
-                        tr.appendChild(td);
-                    });
-                    tbody.appendChild(tr);
-                }
-                tempTable.appendChild(tbody);
-
-                // Wrap table in container with padding and border so PDF has safe margins
-                const tempContainer = document.createElement('div');
-                tempContainer.style.background = '#ffffff';
-                tempContainer.style.padding = '20px';
-                tempContainer.style.border = '1px solid #ccc';
-                tempContainer.style.display = 'inline-block';
-                tempContainer.appendChild(tempTable);
-
-                // Position off-screen for rendering
-                tempContainer.style.position = 'absolute';
-                tempContainer.style.left = '-9999px';
-                tempContainer.style.top = '0';
-                document.body.appendChild(tempContainer);
-
-                html2canvas(tempContainer, {
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff'
-                }).then(canvas => {
-                    document.body.removeChild(tempContainer);
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jspdf.jsPDF('l', 'pt', 'a4');
-                    const pageWidth = pdf.internal.pageSize.getWidth();
-                    const pageHeight = pdf.internal.pageSize.getHeight();
-                    const margin = 20; // safe margin on all sides
-                    const imgWidth = pageWidth - margin * 2;
-                    const imgHeight = canvas.height * imgWidth / canvas.width;
-
-                    if (imgHeight <= pageHeight - margin * 2) {
-                        // Single page
-                        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
-                    } else {
-                        // Multi-page: slice the canvas vertically into page-sized chunks
-                        const pageCanvas = document.createElement('canvas');
-                        const pageCtx = pageCanvas.getContext('2d');
-                        const sliceHeight = Math.floor(canvas.width * (pageHeight - margin * 2) / imgWidth);
-                        pageCanvas.width = canvas.width;
-                        pageCanvas.height = sliceHeight;
-
-                        let srcY = 0;
-                        while (srcY < canvas.height) {
-                            pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-                            pageCtx.drawImage(canvas, 0, srcY, canvas.width, sliceHeight, 0, 0, pageCanvas.width, pageCanvas.height);
-                            const pageData = pageCanvas.toDataURL('image/png');
-                            const pageImgHeight = pageCanvas.height * imgWidth / pageCanvas.width;
-                            pdf.addImage(pageData, 'PNG', margin, margin, imgWidth, pageImgHeight);
-                            srcY += sliceHeight;
-                            if (srcY < canvas.height) pdf.addPage();
-                        }
-                    }
-                    pdf.save('cards.pdf');
-                }).catch(error => {
-                    console.error('PDF generation error:', error);
-                    alert('Error generating PDF: ' + error.message);
-                    if (document.body.contains(tempContainer)) document.body.removeChild(tempContainer);
-                });
-
-            } catch (error) {
-                console.error('PDF export error:', error);
-                alert('Error exporting PDF: ' + error.message);
-            }
-        }
             font-weight: 300;
         }
 
@@ -832,10 +709,16 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item">
-              <a class="nav-link" id="uploadNav" href="#" onclick="showSection('upload', event); setActiveNav('uploadNav')">Upload</a>
-            </li>
-
+                        <li class="nav-item">
+                            <a class="nav-link" id="uploadNav" href="#" onclick="showSection('upload', event); setActiveNav('uploadNav')">Upload</a>
+                        </li>
+                        <li class="nav-item">
+                                {% if session.get('role') == 'admin' %}
+                                        <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">All Cards</a>
+                                {% else %}
+                                        <a class="nav-link" id="cardsNav" href="#" onclick="showSection('cards', event); setActiveNav('cardsNav')">Shared Cards</a>
+                                {% endif %}
+                        </li>
             {% if session['user'] and session['user'] != 'c4i4.lab@c4i4.com' %}
             <li class="nav-item">
               <a class="nav-link" id="personalCardsNav" href="#" onclick="showSection('personalCards', event); setActiveNav('personalCardsNav')">Personal Cards</a>
