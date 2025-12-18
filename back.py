@@ -416,11 +416,14 @@ def upload_file():
             # Encode image to base64
             image_base64 = encode_image_to_base64(filepath)
             if len(image_base64) > 6_000_000:  # ~4.5MB base64 safety
-    os.remove(filepath)
-    return jsonify({
-        "error": "Image too large",
-        "details": "Please upload a smaller image (max 4MB)."
-    }), 400
+                os.remove(filepath)
+                return jsonify({
+                    "error": "Image too large",
+                    "details": "Please upload a smaller image (max 4MB)."
+                }), 400
+
+       
+
 
 
             # Extract details using Gemini API
