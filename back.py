@@ -84,6 +84,7 @@ collection = db[COLLECTION_NAME]
 users_collection = db["users"]
 
 reset_tokens = {}
+upload_locks = {}
 
 # SMTP configuration - Load from environment
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.example.com")
@@ -384,6 +385,20 @@ def index():
 @app.route("/upload", methods=["POST"])
 def upload_file():
     try:
+        user_email = session.get("user")
+
+        # Prevent rapid repeated uploads by same user
+        now = time.time()
+        last_upload = upload_locks.get(user_email, 0)
+
+        if now - last_upload < 5:  # 5 seconds cooldown
+            return jsonify({
+                "error": "Too many upload attempts",
+                "details": "Please wait a few seconds before uploading again."
+            }), 429
+
+        upload_locks[user_email] = now
+
         if "file" not in request.files:
             print("No file part in request.files")
             return jsonify({"error": "No file part"}), 400
@@ -394,12 +409,19 @@ def upload_file():
             return jsonify({"error": "No selected file"}), 400
 
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+            filename = f"{int(time.time())}_{secure_filename(file.filename)}"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             file.save(filepath)
 
             # Encode image to base64
             image_base64 = encode_image_to_base64(filepath)
+            if len(image_base64) > 6_000_000:  # ~4.5MB base64 safety
+    os.remove(filepath)
+    return jsonify({
+        "error": "Image too large",
+        "details": "Please upload a smaller image (max 4MB)."
+    }), 400
+
 
             # Extract details using Gemini API
             extracted_data = extract_details_with_gemini(image_base64)
