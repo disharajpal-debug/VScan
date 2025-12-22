@@ -132,39 +132,52 @@ def encode_image_to_base64(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
+def extract_details_with_grok(image_base64):
+    prompt = f"""
+Extract visiting card details and return ONLY valid JSON:
 
-def extract_details_with_gemini(image_base64):
-    """Extract details from image using Gemini API with retry logic for rate limiting"""
+{{
+  "name": null,
+  "company": null,
+  "designation": null,
+  "email": null,
+  "phone": null,
+  "address": null,
+  "website": null,
+  "additional_info": null
+}}
+
+Image (base64):
+{image_base64[:1200]}
+"""
+
     headers = {
+        "Authorization": f"Bearer {GROK_API_KEY}",
         "Content-Type": "application/json",
     }
 
-    prompt = """
-    Please analyze this visiting card image and extract the following information in JSON format:
-    {
-        "name": "Full name of the person",
-        "company": "Company name",
-        "designation": "Job title/position",
-        "email": "Email address",
-        "phone": "Phone number",
-        "address": "Address",
-        "website": "Website URL",
-        "additional_info": "Any other relevant information"
+    payload = {
+        "model": GROK_MODEL,
+        "messages": [
+            {"role": "system", "content": "You are an OCR engine. Return JSON only."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
     }
-    
-    If any field is not found, set it to null. Return only the JSON object, no additional text.
-    """
 
-    data = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt},
-                    {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}},
-                ]
-            }
-        ]
-    }
+    response = requests.post(GROK_API_URL, headers=headers, json=payload, timeout=30)
+
+    if response.status_code != 200:
+        return {"error": "Grok API failed", "status": response.status_code}
+
+    content = response.json()["choices"][0]["message"]["content"]
+
+    try:
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        return json.loads(content[start:end])
+    except Exception:
+        return {"error": "Invalid JSON from Grok", "raw": content}}
 
 def call_grok_with_retry(prompt):
     max_retries = 3
