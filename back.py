@@ -165,80 +165,103 @@ def extract_details_with_gemini(image_base64):
         ]
     }
 
-    # Retry logic with exponential backoff
+   def call_grok_with_retry(prompt):
     max_retries = 3
-    retry_delay = 2  # Start with 2 seconds
+    retry_delay = 2  # seconds
+
+    headers = {
+        "Authorization": f"Bearer {GROK_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": GROK_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an intelligent assistant that returns JSON only.",
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        "temperature": 0.2,
+    }
 
     for attempt in range(max_retries):
         try:
             response = requests.post(
-                f"{GROK_API_URL}?key={GROK_API_KEY}",
+                GROK_API_URL,
                 headers=headers,
-                json=data,
+                json=payload,
                 timeout=30,
             )
 
+            # ✅ SUCCESS
             if response.status_code == 200:
                 result = response.json()
-                if "candidates" in result and len(result["candidates"]) > 0:
-                    content = result["candidates"][0]["content"]["parts"][0]["text"]
-                    # Try to extract JSON from the response
-                    try:
-                        # Find JSON in the response
-                        start_idx = content.find("{")
-                        end_idx = content.rfind("}") + 1
-                        if start_idx != -1 and end_idx != 0:
-                            json_str = content[start_idx:end_idx]
-                            return json.loads(json_str)
-                        else:
-                            return {"error": "No JSON found in response"}
-                    except json.JSONDecodeError:
+
+                content = result["choices"][0]["message"]["content"]
+
+                # Try extracting JSON from Grok response
+                try:
+                    start_idx = content.find("{")
+                    end_idx = content.rfind("}") + 1
+
+                    if start_idx != -1 and end_idx > start_idx:
+                        json_str = content[start_idx:end_idx]
+                        return json.loads(json_str)
+                    else:
                         return {
-                            "error": "Invalid JSON response",
+                            "error": "No JSON found in Grok response",
                             "raw_response": content,
                         }
-                else:
-                    return {"error": "No content in response"}
 
-            # Handle rate limiting (429) and service unavailable (503)
+                except json.JSONDecodeError:
+                    return {
+                        "error": "Invalid JSON from Grok",
+                        "raw_response": content,
+                    }
+
+            # 🔁 RATE LIMIT
             elif response.status_code == 429:
                 if attempt < max_retries - 1:
-                    wait_time = retry_delay * (
-                        2**attempt
-                    )  # Exponential backoff: 2, 4, 8 seconds
+                    wait_time = retry_delay * (2**attempt)
                     print(
-                        f"Rate limited (429). Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                        f"Grok rate limited (429). Retrying in {wait_time}s "
+                        f"(Attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(wait_time)
                     continue
                 else:
                     return {
-                        "error": "API rate limit exceeded",
-                        "details": "Too many requests. Please try again in a few minutes.",
+                        "error": "Grok rate limit exceeded",
+                        "details": "Too many requests. Please try again later.",
                         "status": 429,
                     }
 
+            # 🔁 SERVICE UNAVAILABLE
             elif response.status_code == 503:
                 if attempt < max_retries - 1:
                     wait_time = retry_delay * (2**attempt)
                     print(
-                        f"Service unavailable (503). Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                        f"Grok service unavailable (503). Retrying in {wait_time}s "
+                        f"(Attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(wait_time)
                     continue
                 else:
                     return {
-                        "error": "API service temporarily unavailable",
-                        "details": "The Gemini API is temporarily unavailable. Please try again later.",
+                        "error": "Grok service unavailable",
+                        "details": "Please try again later.",
                         "status": 503,
                     }
 
+            # ❌ OTHER ERRORS
             else:
-                print(
-                    f"Gemini API request failed: {response.status_code} {response.text}"
-                )
                 return {
-                    "error": f"API request failed with status {response.status_code}",
+                    "error": f"Grok API failed with status {response.status_code}",
                     "details": response.text,
                     "status": response.status_code,
                 }
@@ -247,34 +270,35 @@ def extract_details_with_gemini(image_base64):
             if attempt < max_retries - 1:
                 wait_time = retry_delay * (2**attempt)
                 print(
-                    f"Request timeout. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                    f"Grok timeout. Retrying in {wait_time}s "
+                    f"(Attempt {attempt + 1}/{max_retries})"
                 )
                 time.sleep(wait_time)
                 continue
             else:
                 return {
                     "error": "Request timeout",
-                    "details": "The API request took too long. Please try again with a smaller image.",
+                    "details": "Grok request took too long.",
                 }
 
         except requests.exceptions.RequestException as e:
             if attempt < max_retries - 1:
                 wait_time = retry_delay * (2**attempt)
                 print(
-                    f"Network error: {e}. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})"
+                    f"Grok network error: {e}. Retrying in {wait_time}s "
+                    f"(Attempt {attempt + 1}/{max_retries})"
                 )
                 time.sleep(wait_time)
                 continue
             else:
                 return {
                     "error": "Network error",
-                    "details": f"Failed to connect to API: {str(e)}",
+                    "details": str(e),
                 }
 
-    # If all retries failed
     return {
         "error": "Failed after multiple retries",
-        "details": "Could not complete the request after 3 attempts. Please try again later.",
+        "details": "Could not complete Grok request.",
     }
 
 
