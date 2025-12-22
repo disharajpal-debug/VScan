@@ -52,13 +52,13 @@ UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
 
 # API Configuration - Load from environment
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GROK_API_KEY = os.environ.get("GROK_API_KEY")
+GROK_MODEL = os.environ.get("GROK_MODEL", "grok-2-latest")
+GROK_API_URL = "https://api.x.ai/v1/chat/completions"
 
-if not GEMINI_API_KEY:
+if not GROK_API_KEY:
     raise ValueError(
-        "GEMINI_API_KEY not found in environment variables. Please check .env file."
+        "GROK_API_KEY not found in environment variables. Please check .env file."
     )
 
 
@@ -172,7 +172,7 @@ def extract_details_with_gemini(image_base64):
     for attempt in range(max_retries):
         try:
             response = requests.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+                f"{GROK_API_URL}?key={GROK_API_KEY}",
                 headers=headers,
                 json=data,
                 timeout=30,
