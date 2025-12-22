@@ -8,6 +8,7 @@ from flask import (
     session,
     flash,
     make_response,
+
 )
 from flask_cors import CORS
 import os
@@ -165,7 +166,7 @@ def extract_details_with_gemini(image_base64):
         ]
     }
 
-   def call_grok_with_retry(prompt):
+def call_grok_with_retry(prompt):
     max_retries = 3
     retry_delay = 2  # seconds
 
