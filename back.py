@@ -177,7 +177,7 @@ Image (base64):
         end = content.rfind("}") + 1
         return json.loads(content[start:end])
     except Exception:
-        return {"error": "Invalid JSON from Grok", "raw": content}}
+        return {"error": "Invalid JSON from Grok", "raw": content}
 
 def call_grok_with_retry(prompt):
     max_retries = 3
@@ -460,15 +460,18 @@ def upload_file():
                     "details": "Please upload a smaller image (max 4MB)."
                 }), 400
 
-       
+            # Extract details using Grok API
+            extracted_data = extract_details_with_grok(image_base64)
 
-
-
-            # Extract details using Gemini API
-            extracted_data = extract_details_with_gemini(image_base64)
+            if not isinstance(extracted_data, dict):
+                os.remove(filepath)
+                return jsonify({
+                    "error": "Invalid response from extraction service",
+                    "details": "Unexpected response format"
+                }), 500
 
             if "error" in extracted_data:
-                print(f"Gemini extraction error: {extracted_data}")
+                print(f"Grok extraction error: {extracted_data}")
                 os.remove(filepath)
 
                 # Return appropriate status code based on error type
